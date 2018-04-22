@@ -5,6 +5,7 @@ from linebot.exceptions import InvalidSignatureError
 from linebot.models import (
     MessageEvent, TextMessage, TextSendMessage,
 )
+from datetime import datetime
 
 
 def register_url(app):
@@ -14,7 +15,7 @@ def register_url(app):
 
 class IndexView(View):
     def dispatch_request(self):
-        return "Hello From Triple T."
+        return "Hello From Triple T at {0}.".format(datetime.now().strftime("%Y/%m/%d %H:%M"))
 
 
 class LineRequestView(View):
@@ -29,13 +30,19 @@ class LineRequestView(View):
         current_app.logger.info("Request body: " + body)
         # handle webhook body
         try:
-            current_app.handler.handle(body, signature)
+            events = current_app.parser.parse(body, signature)
         except InvalidSignatureError:
             abort(400)
+        handle_event(events)
         return 'OK'
 
 
-@current_app.handler.add(MessageEvent, message=TextMessage)
+def handle_event(events):
+    for ev in events:
+        if isinstance(ev, MessageEvent):
+            handle_message(ev)
+
+
 def handle_message(event):
     current_app.linebot.reply_message(
         event.reply_token,

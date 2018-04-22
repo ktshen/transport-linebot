@@ -1,5 +1,4 @@
 myenv/
 .idea/
 __pycache__/
-
-settings.py
+.env

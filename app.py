@@ -1,11 +1,23 @@
 from flask import Flask
-from .views import register_url
-from linebot import LineBotApi, WebhookHandler
+from views import register_url
+from linebot import LineBotApi, WebhookParser
+from dotenv import load_dotenv
+import os
+
 
 app = Flask(__name__)
-app.config.from_pyfile("settings.py")
+
+# Load env variables
+dotenv_path = os.path.join(os.getcwd(), '.env')
+if os.path.exists(dotenv_path):
+    load_dotenv(dotenv_path=dotenv_path)
+app.config.update(os.environ)
+
+# Create Linebot instance
 app.linebot = LineBotApi(app.config['CHANNEL_ACCESS_TOKEN'])
-app.handler = WebhookHandler(app.config['CHANNEL_SECRET'])
+app.parser = WebhookParser(app.config['CHANNEL_SECRET'])
+
+# Register routing rule
 register_url(app)
 
 
