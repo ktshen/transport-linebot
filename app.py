@@ -11,7 +11,14 @@ app = Flask(__name__)
 dotenv_path = os.path.join(os.getcwd(), '.env')
 if os.path.exists(dotenv_path):
     load_dotenv(dotenv_path=dotenv_path)
-app.config.update(os.environ)
+
+# Config
+app.config.update({
+    "DEBUG": True if os.getenv("DEBUG") == "True" else False,
+    "DATABASE_URI": os.getenv("DATABASE_URI"),
+    "CHANNEL_ACCESS_TOKEN": os.getenv("CHANNEL_ACCESS_TOKEN"),
+    "CHANNEL_SECRET":  os.getenv("CHANNEL_SECRET"),
+})
 
 # Create Linebot instance
 app.linebot = LineBotApi(app.config['CHANNEL_ACCESS_TOKEN'])
