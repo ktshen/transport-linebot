@@ -2,13 +2,15 @@ from flask import request, abort
 from flask import current_app
 from flask.views import View
 from linebot.exceptions import InvalidSignatureError
-from linebot.models import (
-    MessageEvent, TextMessage, TextSendMessage,
-)
 from datetime import datetime
+
+from handlers import handle_events
 
 
 def register_url(app):
+    """
+    Add new routing rules here
+    """
     app.add_url_rule('/', view_func=IndexView.as_view("index"))
     app.add_url_rule('/callback', view_func=LineRequestView.as_view('line'))
 
@@ -33,21 +35,5 @@ class LineRequestView(View):
             events = current_app.parser.parse(body, signature)
         except InvalidSignatureError:
             abort(400)
-        handle_event(events)
+        handle_events(events)
         return 'OK'
-
-
-def handle_event(events):
-    for ev in events:
-        if isinstance(ev, MessageEvent):
-            handle_message(ev)
-
-
-def handle_message(event):
-    current_app.linebot.reply_message(
-        event.reply_token,
-        TextSendMessage(text="Hello Bruce."))
-
-
-
-
