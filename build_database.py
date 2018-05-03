@@ -1,10 +1,10 @@
 import traceback
 import sys
-
 from utils import request_MOTC, convert_date_to_string
 from datetime import datetime, date, timedelta
-from models import TRA_Train, TRA_TrainTimeTable, TRA_TableEntry, TRA_BuildingStatusOnDate
 from sqlalchemy.orm.exc import NoResultFound
+
+from models import TRA_Train, TRA_TrainTimeTable, TRA_TableEntry, TRA_BuildingStatusOnDate
 from data import TRA_STATION_CODE2NAME, TRA_TRAINTYPE_CODE2NAME
 
 

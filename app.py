@@ -1,10 +1,10 @@
-from flask import Flask
-from views import register_url
-from linebot import LineBotApi, WebhookParser
-from dotenv import load_dotenv
 import os
 import sys
+from flask import Flask
+from linebot import LineBotApi, WebhookParser
+from dotenv import load_dotenv
 
+from views import register_url
 
 app = Flask(__name__)
 
