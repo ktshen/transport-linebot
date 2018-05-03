@@ -2,3 +2,4 @@ myenv/
 .idea/
 __pycache__/
 .env
+*.db

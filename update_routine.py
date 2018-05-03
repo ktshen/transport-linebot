@@ -3,7 +3,7 @@ from models import Base
 from datetime import datetime, timedelta
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from build_database import build_TRA_DATABASE_by_date
+from build_database import build_TRA_Database_by_date
 from utils import convert_date_to_string
 import time
 
@@ -14,22 +14,23 @@ try:
 except KeyError:
     raise KeyError("Please specify DATABASE_URI in environment")
 
-engine = create_engine(DATABASE_URI, echo=True)
+engine = create_engine(DATABASE_URI)
 Base.metadata.create_all(engine)
-session = sessionmaker(bind=engine)
+Session = sessionmaker(bind=engine)
+session = Session()
 
 
 def build_TRA():
     """
     Building strategy for TRA:
     1. update tomorrow's data on every midnight anyway
-    2. make sure that data within a week has existed
+    2. make sure that data within two weeks has existed
     """
     today = datetime.now().date()
-    for i in range(7):
-        d = today + timedelta(1)
+    for i in range(14):
+        d = today + timedelta(i)
         ignore_built = True if i == 0 else False
-        resp = build_TRA_DATABASE_by_date(d, session, ignore_built)
+        resp = build_TRA_Database_by_date(d, session, ignore_built)
         print("Update TRA DATABASE on {0}, result={1}".format(convert_date_to_string(d),
                                                               resp.message))
 
@@ -51,7 +52,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
-

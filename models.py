@@ -6,9 +6,7 @@ from sqlalchemy.orm import relationship, backref
 Base = declarative_base()
 
 
-class TimeTableEntry(Base):
-    __tablename__ = "timetable_entry"
-
+class TableEntry(object):
     id = Column(Integer, primary_key=True)
     station_name = Column(String(10))
     arrival_time = Column(DateTime)
@@ -42,10 +40,16 @@ class TRA_QuestionState(Base):
 
 
 class TRA_Train(Base):
+    """
+    1. This class represents each train according to its train number and train type.
+    2. Every TRA_Train has only one TRA_TrainTimeTable on each dates and TRA_TrainTimeTable
+    may vary from date to date.
+    3. Call traintimetable attribute to access TRA_TrainTimeTable.
+    """
     __tablename__ = 'tra_train'
 
     id = Column(Integer, primary_key=True)
-    train_no = Column(String(5))
+    train_no = Column(String(5), unique=True)
     train_type = Column(String(5))
 
     def __init__(self, train_no, train_type):
@@ -54,14 +58,43 @@ class TRA_Train(Base):
 
 
 class TRA_TrainTimeTable(Base):
+    """
+    Call ".entries' attribute to access TRA_TableEntry
+    """
     __tablename__ = 'tra_traintimetable'
 
     id = Column(Integer, primary_key=True)
     date = Column(Date)
     train_id = Column(Integer, ForeignKey('tra_train.id'))
-    train = relationship("TRA_Train", backref=backref("traintimetable"))
-    timetable_entry_id = Column(Integer, ForeignKey('timetable_entry.id'))
-    timetable_entrylist = relationship("TimeTableEntry", backref=backref("tra_traintimetable"))
+    train = relationship("TRA_Train",
+                         backref=backref("traintimetable", cascade="all, delete-orphan"))
 
     def __init__(self, date):
         self.date = date
+
+
+class TRA_TableEntry(TableEntry, Base):
+    __tablename__ = "tra_tableentry"
+
+    timetable_id = Column(Integer, ForeignKey('tra_traintimetable.id'))
+    timetable = relationship("TRA_TrainTimeTable",
+                             backref=backref("entries", cascade="all, delete-orphan"))
+
+
+class TRA_BuildingStatusOnDate(Base):
+    """
+    :param assigned_date : the date that this class is responsible for
+    :param update_date : the latest update date
+    :param status : 0: not built yet, 1: building, 2: built, 3: remove
+    """
+    __tablename__ = "tra_dataupdatestatus"
+
+    id = Column(Integer, primary_key=True)
+    assigned_date = Column(Date, unique=True)
+    update_date = Column(Date)
+    status = Column(Integer)
+
+    def __init__(self, assigned_date, update_date=None, status=0):
+        self.assigned_date = assigned_date
+        self.update_date = update_date
+        self.status = status
