@@ -43,11 +43,11 @@ def request_main_menu():
 
 def search_TRA_train(event):
     old_states = current_app.session.query(TRA_QuestionState).filter_by(expired=False) \
-                                    .filter_by(user=event.source.userId).all()
+                                    .filter_by(user=event.source.user_id).all()
     for s in old_states:
         s.expired = True
-    q_state = TRA_QuestionState(group=None if not hasattr(event.source, "groupId") else event.source.groupId,
-                                user=event.source.userId)
+    q_state = TRA_QuestionState(group=None if not hasattr(event.source, "group_id") else event.source.group_id,
+                                user=event.source.user_id)
     current_app.session.add()
     current_app.commit()
     message = TextSendMessage(text="請輸入啟程站")
@@ -70,10 +70,10 @@ def request_TRA_matching_train(question_state):
 def ask_TRA_question_states(event):
     now = datetime.now()
     q = current_app.session.query(TRA_QuestionState).filter_by(expired=False) \
-                           .filter_by(user=event.source.userId) \
+                           .filter_by(user=event.source.user_id) \
                            .filter(TRA_QuestionState.update < (now - timedelta(hours=1)))
-    if hasattr(event.source, "groupId"):
-        q = q.filter_by(group=event.source.groupId)
+    if hasattr(event.source, "group_id"):
+        q = q.filter_by(group=event.source.group_id)
     try:
         q = q.one()
     except NoResultFound:
