@@ -42,7 +42,7 @@ def request_main_menu():
 
 
 def search_TRA_train(event):
-    old_states = current_app.session.query(TRA_QuestionState).filter(expired=False) \
+    old_states = current_app.session.query(TRA_QuestionState).filter_by(expired=False) \
                                     .filter_by(user=event.source.userId).all()
     for s in old_states:
         s.expired = True
@@ -69,7 +69,7 @@ def request_TRA_matching_train(question_state):
 
 def ask_TRA_question_states(event):
     now = datetime.now()
-    q = current_app.session.query(TRA_QuestionState).filter(expired=False) \
+    q = current_app.session.query(TRA_QuestionState).filter_by(expired=False) \
                            .filter_by(user=event.source.userId) \
                            .filter(TRA_QuestionState.update < (now - timedelta(hours=1)))
     if hasattr(event.source, "groupId"):
