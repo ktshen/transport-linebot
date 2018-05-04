@@ -1,3 +1,4 @@
+from datetime import datetime
 from sqlalchemy import Column, Integer, String, DateTime, Date, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import ForeignKey
@@ -38,6 +39,7 @@ class TRA_QuestionState(Base):
         self.destination = destination_station
         self.departure_time = departure_time
         self.expired = expired
+        self.update = datetime.now()
 
     def __repr__(self):
         return "QuestionState's id: {}".format(self.id)
