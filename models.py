@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Date
+from sqlalchemy import Column, Integer, String, DateTime, Date, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import ForeignKey
 from sqlalchemy.orm import relationship, backref
@@ -24,16 +24,20 @@ class TRA_QuestionState(Base):
     id = Column(Integer, primary_key=True)
     group = Column(String(30))
     user = Column(String(30))
-    departure_time = Column(DateTime)
     departure_station = Column(String(30))
-    terminal_station = Column(String(30))
+    destination_station = Column(String(30))
+    departure_time = Column(DateTime)
+    expired = Column(Boolean)
+    update = Column(DateTime)
 
-    def __init__(self, group, user, departure_time, departure_station, terminal_station):
+    def __init__(self, group, user, departure_station="", destination_station="", departure_time=None,
+                 expired=False):
         self.group = group
         self.user = user
-        self.departure_time = departure_time
         self.departure_station = departure_station
-        self.terminal_station = terminal_station
+        self.destination = destination_station
+        self.departure_time = departure_time
+        self.expired = expired
 
     def __repr__(self):
         return "QuestionState's id: {}".format(self.id)

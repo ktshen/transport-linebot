@@ -8,7 +8,7 @@ from datetime import datetime, date
 from time import mktime
 import base64
 import requests
-
+import re
 
 def request_MOTC(url):
     """
@@ -42,3 +42,11 @@ def convert_date_to_string(date_input):
         return date_input.strftime("%Y-%m-%d")
     else:
         raise TypeError("Input {0} is not a date object".format(type(date_input)))
+
+
+def pre_process_text(text):
+    """
+    Deal with word like "臺" and "台", replace it with appropriate word
+    """
+    text = re.sub(r'台', '臺', text)
+    return text

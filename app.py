@@ -3,13 +3,16 @@ import sys
 from flask import Flask
 from linebot import LineBotApi, WebhookParser
 from dotenv import load_dotenv
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 from views import register_url
+from models import Base
 
 app = Flask(__name__)
 
 # Load env variables
-dotenv_path = os.path.join(os.getcwd(), '.env')
+dotenv_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), '.env')
 if os.path.exists(dotenv_path):
     load_dotenv(dotenv_path=dotenv_path)
 
@@ -31,6 +34,12 @@ except KeyError:
 
 # Register routing rule
 register_url(app)
+
+# Create sqlalchemy session
+engine = create_engine(app.config["DATABASE_URI"])
+Base.metadata.create_all(engine)
+Session = sessionmaker(bind=engine)
+app.session = Session()
 
 
 if __name__ == "__main__":

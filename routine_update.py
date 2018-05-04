@@ -24,6 +24,7 @@ Base.metadata.create_all(engine)
 Session = sessionmaker(bind=engine)
 session = Session()
 
+
 def build_TRA():
     """
     Building strategy for TRA:
