@@ -84,7 +84,9 @@ class TRA_TableEntry(TableEntry, Base):
 
     timetable_id = Column(Integer, ForeignKey('tra_traintimetable.id'))
     timetable = relationship("TRA_TrainTimeTable",
-                             backref=backref("entries", cascade="all, delete-orphan"))
+                             backref=backref("entries",
+                                             cascade="all, delete-orphan",
+                                             order_by='TRA_TableEntry.arrival_time'))
 
 
 class TRA_BuildingStatusOnDate(Base):

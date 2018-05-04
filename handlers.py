@@ -9,12 +9,12 @@ from linebot.models import (
 from linebot.exceptions import LineBotApiError
 from sqlalchemy.orm.exc import NoResultFound
 
-from models import TRA_QuestionState
+from models import TRA_QuestionState, TRA_TableEntry, TRA_TrainTimeTable
 from data import TRA_STATION_CODE2NAME
 from utils import pre_process_text
 
 
-def response_error_message(text=""):
+def create_error_text_message(text=""):
     if not text:
         text = "系統發生錯誤，請稍後再試，謝謝～"
     return TextSendMessage(text=text)
@@ -50,7 +50,7 @@ def search_TRA_train(event):
                                 user=event.source.user_id)
     current_app.session.add(q_state)
     current_app.session.commit()
-    message = TextSendMessage(text="請輸入啟程站")
+    message = TextSendMessage(text="請輸入起程站")
     return message
 
 
@@ -63,8 +63,32 @@ def match_TRA_station_name(text):
     return None
 
 
-def request_TRA_matching_train(question_state):
-    pass
+def request_TRA_matching_train(qs):
+    q = current_app.session.query(TRA_TrainTimeTable).join("entries") \
+                           .filter(TRA_TableEntry.station_name == qs.departure_station) \
+                           .filter(TRA_TableEntry.station_name == qs.destination_station) \
+                           .filter(TRA_TableEntry.arrival_time > qs.departure_time)
+    suitable_trains = list()
+    for t in q:
+        dep_entry = current_app.session().query(TRA_TableEntry) \
+                                         .filter(TRA_TableEntry.timetable == t) \
+                                         .filter_by(station_name=qs.departure_station).one()
+        dest_entry = current_app.session().query(TRA_TableEntry) \
+                                          .filter(TRA_TableEntry.timetable==t) \
+                                          .filter_by(station_name=qs.destination_station) \
+                                          .filter(dep_entry.arrival_time < TRA_TableEntry.arrival_time).one()
+        suitable_trains.append([t, dep_entry, dest_entry])
+    if not suitable_trains:
+        text = "無適合班次"
+    else:
+        text = "適合班次如下\n" \
+               "車次  車種  開車時間  抵達時間\n"
+        fmt = "{0: <4} {1: >3}   {2}     {3}\n"
+        for _l in suitable_trains:
+            text = text + fmt.format(_l[0].train.train_id, _l[0].train.train_type,
+                                     _l[1].departure_time, _l[2].arrival_time)
+    q.expired = True
+    return TextSendMessage(text=text)
 
 
 def ask_TRA_question_states(event):
@@ -87,26 +111,28 @@ def ask_TRA_question_states(event):
             message = TextSendMessage(text="請輸入目的站")
     elif not q.destination_station:
         res = match_TRA_station_name(event.message.text)
-        if res:
+        if not res and res != q.departure_station:
             q.destination_station = res
-            title = '請選擇搭乘時間: {0} -> {1}'.format(q.departure_station, q.destination_station)
+            title = '請選擇搭乘時間: {0} → {1}'.format(q.departure_station, q.destination_station)
             message = TemplateSendMessage(
                 alt_text='請選擇搭乘時間',
                 template=ButtonsTemplate(
                     title=title,
                     text='點擊選擇',
                     actions=[
-                        DatetimePickerTemplateAction(label='選擇時間', data='datetime_postback',
+                        DatetimePickerTemplateAction(label='搭乘時間', data='datetime_postback',
                                                      mode='datetime'),
                     ]
                 )
             )
+        elif res == q.departure_station:
+            message = create_error_text_message(
+                text="輸入的目的站與起程站皆是{0}，請重新輸入有效目的站".format(res))
     elif not q.departure_time and isinstance(event, PostbackEvent):
         dt = event.postback.params["datetime"]
         dt = datetime.strptime(dt, "%Y-%m-%dT%H:%M")
         q.departure_time = dt
-        # message = request_TRA_matching_train(q)
-        message = TextSendMessage(text="完成～～")
+        message = request_TRA_matching_train(q)
     if message:
         q.update = now
         current_app.session.commit()
@@ -119,14 +145,12 @@ def match_text_and_assign(event):
     """
     res = None
     text = event.message.text
-    if re.fullmatch(r'[ ]*([tT]|查(交通)?)', text):
+    if re.fullmatch(r'[ ]*([tT]+|查(交通|時刻表|班次)?)', text):
         res = request_main_menu()
     elif re.fullmatch(r'[ ]*查?(台鐵|TRA)', text):
         res = search_TRA_train(event)
     else:
         res = ask_TRA_question_states(event)
-        if res:
-            return res
     return res
 
 
@@ -135,7 +159,7 @@ def handle_message_event(event):
         response = match_text_and_assign(event)
     except LineBotApiError as e:
         current_app.logger.error(e)
-        response = response_error_message()
+        response = create_error_text_message()
     if response is not None:
         current_app.linebot.reply_message(event.reply_token, response)
 
