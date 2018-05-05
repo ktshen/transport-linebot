@@ -7,7 +7,7 @@ from linebot.models import (
     MessageTemplateAction, DatetimePickerTemplateAction
 )
 from linebot.exceptions import LineBotApiError
-from sqlalchemy.orm.exc import NoResultFound
+from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
 
 from models import TRA_QuestionState, TRA_TableEntry, TRA_TrainTimeTable
 from data import TRA_STATION_CODE2NAME
@@ -64,29 +64,47 @@ def match_TRA_station_name(text):
 
 
 def request_TRA_matching_train(qs):
-    q = current_app.session.query(TRA_TrainTimeTable).join("entries") \
-                           .filter(TRA_TableEntry.station_name == qs.departure_station) \
-                           .filter(TRA_TableEntry.station_name == qs.destination_station) \
-                           .filter(TRA_TableEntry.arrival_time > qs.departure_time)
+    q_1 = current_app.session.query(TRA_TrainTimeTable).join("entries") \
+                             .filter(TRA_TableEntry.station_name == qs.departure_station) \
+                             .filter(TRA_TableEntry.departure_time > qs.departure_time)
+    q_2 = current_app.session.query(TRA_TrainTimeTable).join("entries") \
+                             .filter(TRA_TableEntry.station_name == qs.destination_station) \
+                             .filter(TRA_TableEntry.arrival_time > qs.departure_time)
+    q = q_1.intersect(q_2)
     suitable_trains = list()
     for t in q:
-        dep_entry = current_app.session().query(TRA_TableEntry) \
-                                         .filter(TRA_TableEntry.timetable == t) \
-                                         .filter_by(station_name=qs.departure_station).one()
-        dest_entry = current_app.session().query(TRA_TableEntry) \
-                                          .filter(TRA_TableEntry.timetable==t) \
-                                          .filter_by(station_name=qs.destination_station) \
-                                          .filter(dep_entry.arrival_time < TRA_TableEntry.arrival_time).one()
+        dep_q = current_app.session.query(TRA_TableEntry) \
+                                   .filter(TRA_TableEntry.timetable == t) \
+                                   .filter_by(station_name=qs.departure_station) \
+                                   .filter(TRA_TableEntry.departure_time > qs.departure_time) \
+                                   .order_by(TRA_TableEntry.departure_time)
+        try:
+            dep_entry = dep_q.one()
+        except MultipleResultsFound:
+            dep_entry = dep_q.first()
+        dest_q = current_app.session.query(TRA_TableEntry) \
+                                    .filter(TRA_TableEntry.timetable == t) \
+                                    .filter_by(station_name=qs.destination_station) \
+                                    .filter(dep_entry.departure_time < TRA_TableEntry.arrival_time) \
+                                    .order_by(TRA_TableEntry.departure_time)
+        try:
+            dest_entry = dest_q.one()
+        except MultipleResultsFound:
+            dest_entry = dest_q.first()
+        except NoResultFound:
+            continue
         suitable_trains.append([t, dep_entry, dest_entry])
+    sorted(suitable_trains, key=lambda x: x[1].departure_time)
     if not suitable_trains:
         text = "無適合班次"
     else:
-        text = "適合班次如下\n" \
-               "車次  車種  開車時間  抵達時間\n"
-        fmt = "{0: <4} {1: >3}   {2}     {3}\n"
+        text = "適合班次如下  {0} → {1} \n" \
+               "車次   車種  開車時間  抵達時間\n".format(qs.departure_station, qs.destination_station)
+        fmt = "{0:0>4}  {1:^2}     {2}        {3}\n"
         for _l in suitable_trains:
-            text = text + fmt.format(_l[0].train.train_id, _l[0].train.train_type,
-                                     _l[1].departure_time, _l[2].arrival_time)
+            text = text + fmt.format(_l[0].train.train_no, _l[0].train.train_type,
+                                     _l[1].departure_time.strftime("%H:%M"),
+                                     _l[2].arrival_time.strftime("%H:%M"))
     q.expired = True
     return TextSendMessage(text=text)
 
@@ -111,7 +129,7 @@ def ask_TRA_question_states(event):
             message = TextSendMessage(text="請輸入目的站")
     elif not q.destination_station:
         res = match_TRA_station_name(event.message.text)
-        if not res and res != q.departure_station:
+        if res and res != q.departure_station:
             q.destination_station = res
             title = '請選擇搭乘時間: {0} → {1}'.format(q.departure_station, q.destination_station)
             message = TemplateSendMessage(
@@ -158,7 +176,8 @@ def handle_message_event(event):
     try:
         response = match_text_and_assign(event)
     except LineBotApiError as e:
-        current_app.logger.error(e)
+        current_app.logger.error(e.error.message)
+        current_app.logger.error(e.error.details)
         response = create_error_text_message()
     if response is not None:
         current_app.linebot.reply_message(event.reply_token, response)

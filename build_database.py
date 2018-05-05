@@ -147,6 +147,7 @@ def build_TRA_traintimetable(table_input, session, date_input):
     timetable.train = train
     # Create a list of TimeTableEntry
     cross_day = False
+    previous_departure_time = None
     for entry in table_input["StopTimes"]:
         try:
             station_name = convert_TRA_station_code2name(entry["StationID"])
@@ -163,6 +164,9 @@ def build_TRA_traintimetable(table_input, session, date_input):
             cross_day = True
             arrival_date = date_input
             departure_date = date_input + timedelta(1)
+        elif previous_departure_time and arrival_time < previous_departure_time:
+            cross_day = True
+            arrival_date = departure_date = date_input + timedelta(1)
         else:
             arrival_date = departure_date = date_input
 
@@ -172,6 +176,7 @@ def build_TRA_traintimetable(table_input, session, date_input):
             departure_time=datetime.combine(departure_date, departure_time)
         )
         timetable.entries.append(table_entry)
+        previous_departure_time = departure_time
     session.add(timetable)
     update_TRA_building_status(date_input, 2, session)
 
