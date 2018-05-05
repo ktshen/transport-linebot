@@ -43,7 +43,7 @@ def request_main_menu():
 
 def search_TRA_train(event):
     old_states = current_app.session.query(TRA_QuestionState).filter_by(expired=False) \
-                                    .filter_by(user=event.source.user_id).all()
+        .filter_by(user=event.source.user_id).all()
     for s in old_states:
         s.expired = True
     q_state = TRA_QuestionState(group=None if not hasattr(event.source, "group_id") else event.source.group_id,
@@ -65,28 +65,28 @@ def match_TRA_station_name(text):
 
 def request_TRA_matching_train(qs):
     q_1 = current_app.session.query(TRA_TrainTimeTable).join("entries") \
-                             .filter(TRA_TableEntry.station_name == qs.departure_station) \
-                             .filter(TRA_TableEntry.departure_time > qs.departure_time)
+        .filter(TRA_TableEntry.station_name == qs.departure_station) \
+        .filter(TRA_TableEntry.departure_time > qs.departure_time)
     q_2 = current_app.session.query(TRA_TrainTimeTable).join("entries") \
-                             .filter(TRA_TableEntry.station_name == qs.destination_station) \
-                             .filter(TRA_TableEntry.arrival_time > qs.departure_time)
+        .filter(TRA_TableEntry.station_name == qs.destination_station) \
+        .filter(TRA_TableEntry.arrival_time > qs.departure_time)
     q = q_1.intersect(q_2)
     suitable_trains = list()
     for t in q:
         dep_q = current_app.session.query(TRA_TableEntry) \
-                                   .filter(TRA_TableEntry.timetable == t) \
-                                   .filter_by(station_name=qs.departure_station) \
-                                   .filter(TRA_TableEntry.departure_time > qs.departure_time) \
-                                   .order_by(TRA_TableEntry.departure_time)
+            .filter(TRA_TableEntry.timetable == t) \
+            .filter_by(station_name=qs.departure_station) \
+            .filter(TRA_TableEntry.departure_time > qs.departure_time) \
+            .order_by(TRA_TableEntry.departure_time)
         try:
             dep_entry = dep_q.one()
         except MultipleResultsFound:
             dep_entry = dep_q.first()
         dest_q = current_app.session.query(TRA_TableEntry) \
-                                    .filter(TRA_TableEntry.timetable == t) \
-                                    .filter_by(station_name=qs.destination_station) \
-                                    .filter(dep_entry.departure_time < TRA_TableEntry.arrival_time) \
-                                    .order_by(TRA_TableEntry.departure_time)
+            .filter(TRA_TableEntry.timetable == t) \
+            .filter_by(station_name=qs.destination_station) \
+            .filter(dep_entry.departure_time < TRA_TableEntry.arrival_time) \
+            .order_by(TRA_TableEntry.departure_time)
         try:
             dest_entry = dest_q.one()
         except MultipleResultsFound:
@@ -112,8 +112,8 @@ def request_TRA_matching_train(qs):
 def ask_TRA_question_states(event):
     now = datetime.now()
     q = current_app.session.query(TRA_QuestionState).filter_by(expired=False) \
-                           .filter_by(user=event.source.user_id) \
-                           .filter(TRA_QuestionState.update > (now - timedelta(hours=1)))
+        .filter_by(user=event.source.user_id) \
+        .filter(TRA_QuestionState.update > (now - timedelta(hours=1)))
     if hasattr(event.source, "group_id"):
         q = q.filter_by(group=event.source.group_id)
     try:
@@ -183,8 +183,12 @@ def handle_message_event(event):
         current_app.linebot.reply_message(event.reply_token, response)
 
 
-def handle_follow_event(ev):
-    pass
+def handle_follow_event(event):
+    text = "hi~ 我是火車時刻機器人 \U0001f686\n" \
+           "> 輸入: 大寫或小寫T \n" \
+           "就可以呼叫我喔～～\U0001f618\n"
+    response = TextSendMessage(text=text)
+    current_app.linebot.reply_message(event.reply_token, response)
 
 
 def handle_unfollow_event(ev):
