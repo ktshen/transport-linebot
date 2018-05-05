@@ -94,7 +94,7 @@ def request_TRA_matching_train(qs):
         except NoResultFound:
             continue
         suitable_trains.append([t, dep_entry, dest_entry])
-    sorted(suitable_trains, key=lambda x: x[1].departure_time)
+    suitable_trains = sorted(suitable_trains, key=lambda x: x[1].departure_time)
     if not suitable_trains:
         text = "無適合班次"
     else:
