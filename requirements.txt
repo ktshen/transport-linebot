@@ -3,7 +3,6 @@ Flask-Migrate==2.1.1
 Flask-SQLAlchemy==2.3.2
 gunicorn==19.7.1
 line-bot-sdk==1.5.0
-psycopg2==2.7.4
 python-dotenv==0.8.2
 requests==2.18.4
 SQLAlchemy==1.2.7
