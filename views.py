@@ -34,6 +34,7 @@ class LineRequestView(View):
         try:
             events = current_app.parser.parse(body, signature)
         except InvalidSignatureError:
+            current_app.logger.error("Invalid Signature.")
             abort(400)
         handle_events(events)
         return 'OK'

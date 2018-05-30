@@ -11,7 +11,7 @@ services:
     env_file: .env
     volumes:
        - ./db:/root/transport-linebot/db
-
+       - /etc/localtime:/etc/localtime:ro
 
   caddy:
     build: ./compose/caddy
@@ -24,4 +24,5 @@ services:
       - caddy:/root/.caddy
       - ./media:/var/www/app/media
       - ./static:/var/www/app/static
+      - /etc/localtime:/etc/localtime:ro
     env_file: .env

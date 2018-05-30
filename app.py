@@ -40,7 +40,7 @@ engine = create_engine(app.config["DATABASE_URI"])
 Base.metadata.create_all(engine)
 Session = sessionmaker(bind=engine)
 app.session = Session()
-
+app.logger.info("START....")
 
 if __name__ == "__main__":
     app.run()
