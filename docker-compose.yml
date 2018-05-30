@@ -1,7 +1,9 @@
-version: '2'
+version: '3'
 
 volumes:
   caddy: {}
+  postgres_data: {}
+  postgres_backup: {}
 
 services:
   postgres:
@@ -10,6 +12,8 @@ services:
       - ./postgres_data:/var/lib/postgresql/data
       - ./postgres_backup:/backups
     env_file: .env
+    ports:
+      - "5432:5432"
 
   flask:
     build:

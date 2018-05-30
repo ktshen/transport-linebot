@@ -9,7 +9,7 @@ Base = declarative_base()
 
 class TableEntry(object):
     id = Column(Integer, primary_key=True)
-    station_name = Column(String(10))
+    station_name = Column(String(50))
     arrival_time = Column(DateTime)
     departure_time = Column(DateTime)
 
@@ -23,10 +23,10 @@ class TRA_QuestionState(Base):
     __tablename__ = 'tra_questionstate'
 
     id = Column(Integer, primary_key=True)
-    group = Column(String(30))
-    user = Column(String(30))
-    departure_station = Column(String(30))
-    destination_station = Column(String(30))
+    group = Column(String(100))
+    user = Column(String(100))
+    departure_station = Column(String(100))
+    destination_station = Column(String(100))
     departure_time = Column(DateTime)
     expired = Column(Boolean)
     update = Column(DateTime)
@@ -55,8 +55,8 @@ class TRA_Train(Base):
     __tablename__ = 'tra_train'
 
     id = Column(Integer, primary_key=True)
-    train_no = Column(String(5), unique=True)
-    train_type = Column(String(5))
+    train_no = Column(String(10), unique=True)
+    train_type = Column(String(10))
 
     def __init__(self, train_no, train_type):
         self.train_no = train_no
