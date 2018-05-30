@@ -10,8 +10,8 @@ services:
       dockerfile: ./compose/flask/Dockerfile
     env_file: .env
     volumes:
-       - ./db:/root/transport-linebot/db
-       - /etc/localtime:/etc/localtime:ro
+      - ./db:/root/transport-linebot/db
+      - /etc/localtime:/etc/localtime:ro
 
   caddy:
     build: ./compose/caddy
@@ -26,3 +26,12 @@ services:
       - ./static:/var/www/app/static
       - /etc/localtime:/etc/localtime:ro
     env_file: .env
+
+  routine:
+    build:
+      context: .
+      dockerfile: ./compose/routine/Dockerfile
+    env_file: .env
+    volumes:
+      - ./db:/root/transport-linebot/db
+      - /etc/localtime:/etc/localtime:ro

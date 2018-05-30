@@ -56,19 +56,24 @@ RUN_JOBS_AT_TIME = "00:00"
 JOB_QUEUE = [build_TRA, clear_TRA_history]
 
 
+def run_all_job():
+    for job in JOB_QUEUE:
+        try:
+            job()
+        except Exception as e:
+            print(e)
+            pass
+
+
 def main():
+    run_all_job()
     invoked_time = datetime.strptime(RUN_JOBS_AT_TIME, "%H:%M").time()
     while True:
         time.sleep(60)
         now = datetime.now()
         if now.time() == invoked_time:
             print("Start Running Jobs at {0}".format(now.strftime("%Y-%m-%d %H:%M")))
-            for job in JOB_QUEUE:
-                try:
-                    job()
-                except Exception as e:
-                    print(e)
-                    pass
+        run_all_job()
 
 
 if __name__ == "__main__":
