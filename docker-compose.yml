@@ -4,11 +4,20 @@ volumes:
   caddy: {}
 
 services:
+  postgres:
+    build: ./compose/postgres
+    volumes:
+      - ./postgres_data:/var/lib/postgresql/data
+      - ./postgres_backup:/backups
+    env_file: .env
+
   flask:
     build:
       context: .
       dockerfile: ./compose/flask/Dockerfile
     env_file: .env
+    depends_on:
+      - postgres
     volumes:
       - ./db:/app/db
       - /etc/localtime:/etc/localtime:ro
@@ -30,6 +39,8 @@ services:
       context: .
       dockerfile: ./compose/routine/Dockerfile
     env_file: .env
+    depends_on:
+      - postgres
     volumes:
       - ./db:/app/db
       - /etc/localtime:/etc/localtime:ro
