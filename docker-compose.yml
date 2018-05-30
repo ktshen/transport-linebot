@@ -6,10 +6,12 @@ volumes:
 services:
   flask:
     build:
-      context: compose/flask
+      context: .
       dockerfile: ./compose/flask/Dockerfile
-    command: /gunicorn.sh
     env_file: .env
+    volumes:
+       - ./db:/root/transport-linebot/db
+
 
   caddy:
     build: ./compose/caddy

@@ -4,5 +4,7 @@ ENV PYTHONUNBUFFERED 1
 
 COPY . /app
 
-RUN pip install -no-cache-dir -r /app/requirements.txt
+RUN pip3 install  -r /app/requirements.txt
 
+RUN chmod +x /app/compose/flask/gunicorn.sh
+CMD /app/compose/flask/gunicorn.sh
