@@ -1,0 +1,25 @@
+version: '2'
+
+volumes:
+  caddy: {}
+
+services:
+  flask:
+    build:
+      context: compose/flask
+      dockerfile: ./compose/flask/Dockerfile
+    command: /gunicorn.sh
+    env_file: .env
+
+  caddy:
+    build: ./compose/caddy
+    depends_on:
+      - flask
+    ports:
+      - "0.0.0.0:80:80"
+      - "0.0.0.0:443:443"
+    volumes:
+      - caddy:/root/.caddy
+      - ./media:/var/www/app/media
+      - ./static:/var/www/app/static
+    env_file: .env

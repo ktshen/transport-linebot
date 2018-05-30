@@ -1,0 +1,11 @@
+{%DOMAIN_NAME%} {
+    root /var/www/app
+
+    proxy / flask:5000 {
+        transparent
+    }
+
+    log stdout
+    errors stdout
+    gzip
+}
