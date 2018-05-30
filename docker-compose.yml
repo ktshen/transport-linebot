@@ -10,7 +10,7 @@ services:
       dockerfile: ./compose/flask/Dockerfile
     env_file: .env
     volumes:
-      - ./db:/root/transport-linebot/db
+      - ./db:/app/db
       - /etc/localtime:/etc/localtime:ro
 
   caddy:
@@ -22,8 +22,6 @@ services:
       - "0.0.0.0:443:443"
     volumes:
       - caddy:/root/.caddy
-      - ./media:/var/www/app/media
-      - ./static:/var/www/app/static
       - /etc/localtime:/etc/localtime:ro
     env_file: .env
 
@@ -33,5 +31,6 @@ services:
       dockerfile: ./compose/routine/Dockerfile
     env_file: .env
     volumes:
-      - ./db:/root/transport-linebot/db
+      - ./db:/app/db
       - /etc/localtime:/etc/localtime:ro
+
