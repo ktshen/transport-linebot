@@ -23,10 +23,13 @@ class ResponseMessage(object):
         2: "沒有相關資料",           # when there is no result in response (empty)
         3: "建構資料中，稍後再試",    # When a process has already been building the data
         9: "不知名錯誤",             # Unrecognised Error
+        10: "",                     # Self defined Error
     }
 
-    def __init__(self, value):
+    def __init__(self, value, message=""):
         self.value = value
+        if value == 10:
+            self.status_dict[self.value] = message
 
     def __str__(self):
         print("Response Type: {0}".format(self.message))
@@ -47,6 +50,8 @@ def request_TRA_all_train_no_by_date(date_input):
     resp = resp.json()
     if not resp:
         return ResponseMessage(2)
+    elif "message" in resp:
+        return ResponseMessage(10, resp["message"])
     train_no_list = list()
     for entry in resp:
         train_no = entry["TrainNo"]
@@ -197,8 +202,10 @@ def build_TRA_Database_by_date(date_input, session, ignore_built=False):
         building_status = check_TRA_building_status_by_date(date_input, session)
         if not ignore_built and building_status == 2:
             return ResponseMessage(0)
+        # We assume that only one process is running all the time. So there is no competitive problem
+        # The status is 1 because it is terminated while running previously
         elif building_status == 1:
-            return ResponseMessage(3)
+            pass
 
         # Get a list of train no on specified date
         response = request_TRA_all_train_no_by_date(date_input)
