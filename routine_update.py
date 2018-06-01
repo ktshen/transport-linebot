@@ -22,7 +22,6 @@ except KeyError:
 engine = create_engine(DATABASE_URI)
 Base.metadata.create_all(engine)
 Session = sessionmaker(bind=engine)
-session = Session()
 
 
 def build_TRA():
@@ -31,6 +30,7 @@ def build_TRA():
     1. update tomorrow's data on every midnight anyway
     2. make sure that data within a month has existed
     """
+    session = Session()
     today = datetime.now().date()
     for i in range(30):
         d = today + timedelta(i)
@@ -38,9 +38,11 @@ def build_TRA():
         resp = build_TRA_Database_by_date(d, session, ignore_built)
         print("Update TRA DATABASE on {0}, result={1}".format(convert_date_to_string(d),
                                                               resp.message))
+    session.close()
 
 
 def clear_TRA_history():
+    session = Session()
     history_date = (datetime.now() - timedelta(1)).date()
     q = session.query(TRA_BuildingStatusOnDate) \
                .filter(TRA_BuildingStatusOnDate.assigned_date < history_date).all()
@@ -48,6 +50,7 @@ def clear_TRA_history():
         return True
     for s in q:
         remove_TRA_timetable_by_date(s.assigned_date, session)
+    session.close()
 
 
 # 24-HOUR

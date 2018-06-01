@@ -36,7 +36,7 @@ class TRA_QuestionState(Base):
         self.group = group
         self.user = user
         self.departure_station = departure_station
-        self.destination = destination_station
+        self.destination_station = destination_station
         self.departure_time = departure_time
         self.expired = expired
         self.update = datetime.now()
@@ -65,7 +65,7 @@ class TRA_Train(Base):
 
 class TRA_TrainTimeTable(Base):
     """
-    Call ".entries' attribute to access TRA_TableEntry
+    Call ".entries" attribute to access TRA_TableEntry
     """
     __tablename__ = 'tra_traintimetable'
 

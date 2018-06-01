@@ -1,6 +1,5 @@
 import os
 import sys
-from flask import current_app
 from hashlib import sha1
 import hmac
 from wsgiref.handlers import format_date_time
@@ -19,7 +18,7 @@ def request_MOTC(url):
     app_id = os.getenv('PTX_APP_ID', None)
     app_key = os.getenv('PTX_APP_KEY', None)
     if app_id is None or app_key is None:
-        current_app.logger.error("Please specify PTX_APP_ID and PTX_APP_KEY properly as environmental variable.")
+        print("Please specify PTX_APP_ID and PTX_APP_KEY properly as environmental variable.")
         sys.exit(1)
     xdate = format_date_time(mktime(datetime.now().timetuple()))
     hashed = hmac.new(bytearray(app_key, 'utf-8'), ('x-date: ' + xdate).encode('utf-8'), sha1)

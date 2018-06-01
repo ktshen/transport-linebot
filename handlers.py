@@ -95,18 +95,8 @@ def request_TRA_matching_train(qs):
             continue
         suitable_trains.append([t, dep_entry, dest_entry])
     suitable_trains = sorted(suitable_trains, key=lambda x: x[1].departure_time)
-    if not suitable_trains:
-        text = "無適合班次"
-    else:
-        text = "適合班次如下  {0} → {1} \n" \
-               "車次   車種  開車時間  抵達時間\n".format(qs.departure_station, qs.destination_station)
-        fmt = "{0:0>4}  {1:^2}     {2}        {3}\n"
-        for _l in suitable_trains:
-            text = text + fmt.format(_l[0].train.train_no, _l[0].train.train_type,
-                                     _l[1].departure_time.strftime("%H:%M"),
-                                     _l[2].arrival_time.strftime("%H:%M"))
     q.expired = True
-    return TextSendMessage(text=text)
+    return suitable_trains
 
 
 def ask_TRA_question_states(event):
@@ -150,7 +140,18 @@ def ask_TRA_question_states(event):
         dt = event.postback.params["datetime"]
         dt = datetime.strptime(dt, "%Y-%m-%dT%H:%M")
         q.departure_time = dt
-        message = request_TRA_matching_train(q)
+        suitable_trains = request_TRA_matching_train(q)
+        if not suitable_trains:
+            text = "無適合班次"
+        else:
+            text = "適合班次如下  {0} → {1} \n" \
+                   "車次   車種  開車時間  抵達時間\n".format(q.departure_station, q.destination_station)
+            fmt = "{0:0>4}  {1:^2}     {2}        {3}\n"
+            for _l in suitable_trains:
+                text = text + fmt.format(_l[0].train.train_no, _l[0].train.train_type,
+                                         _l[1].departure_time.strftime("%H:%M"),
+                                         _l[2].arrival_time.strftime("%H:%M"))
+        message = TextSendMessage(text=text)
     if message:
         q.update = now
         current_app.session.commit()

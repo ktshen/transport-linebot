@@ -199,6 +199,7 @@ def build_TRA_Database_by_date(date_input, session, ignore_built=False):
             date_input = date_input.date()
         elif not isinstance(date_input, date):
             raise TypeError("Need a date object.")
+        # This will create a new TRA_BuildingStatusOnDate with status 0 if not exists
         building_status = check_TRA_building_status_by_date(date_input, session)
         if not ignore_built and building_status == 2:
             return ResponseMessage(0)
