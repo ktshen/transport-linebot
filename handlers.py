@@ -151,6 +151,10 @@ def ask_TRA_question_states(event):
                 text = text + fmt.format(_l[0].train.train_no, _l[0].train.train_type,
                                          _l[1].departure_time.strftime("%H:%M"),
                                          _l[2].arrival_time.strftime("%H:%M"))
+                # Total word number of a post is limited
+                if len(text) > 1500:
+                    text = text + "More...\n"
+                    break
         message = TextSendMessage(text=text)
     if message:
         q.update = now

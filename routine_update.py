@@ -19,6 +19,7 @@ try:
 except KeyError:
     raise KeyError("Please specify DATABASE_URI in environment")
 
+time.sleep(5) # wait for postgresql to start
 engine = create_engine(DATABASE_URI)
 Base.metadata.create_all(engine)
 Session = sessionmaker(bind=engine)
@@ -32,11 +33,12 @@ def build_TRA():
     """
     session = Session()
     today = datetime.now().date()
-    for i in range(30):
+    for i in range(int(os.environ["PRESCEDULE_DAYS"])):
         d = today + timedelta(i)
         ignore_built = True if i == 0 else False
+        print("Start building TRA DATABASE on {0}".format(convert_date_to_string(d)))
         resp = build_TRA_Database_by_date(d, session, ignore_built)
-        print("Update TRA DATABASE on {0}, result={1}".format(convert_date_to_string(d),
+        print("Finish TRA DATABASE on {0}, result={1}".format(convert_date_to_string(d),
                                                               resp.message))
     session.close()
 
@@ -76,7 +78,7 @@ def main():
         now = datetime.now()
         if now.time() == invoked_time:
             print("Start Running Jobs at {0}".format(now.strftime("%Y-%m-%d %H:%M")))
-        run_all_job()
+            run_all_job()
 
 
 if __name__ == "__main__":
