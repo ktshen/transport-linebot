@@ -1,23 +1,21 @@
 import unittest
-from unittest.mock import MagicMock, Mock
+from unittest.mock import MagicMock
 import os
 from datetime import datetime
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from linebot.models import PostbackEvent
-from .load_example import load_example_timetable_to_database, remove_example_timetable_from_database
+from linebot.exceptions import LineBotApiError
 
-from models import (
-    Base, TRA_QuestionState, TRA_BuildingStatusOnDate, TRA_Train,
-    TableEntry, TRA_TrainTimeTable
-)
+from .load_example import load_example_timetable_to_database, drop_all_table
+from models import Base, TRA_QuestionState, User, Group
 from handlers import (
-    request_TRA_matching_train, ask_TRA_question_states
+    request_TRA_matching_train, ask_TRA_question_states,
+    handle_follow_event, handle_join_event, handle_unfollow_event, handle_leave_event
 )
 from app import app
 
 engine = create_engine(os.environ["TESTING_DATABASE_URI"])
-Base.metadata.create_all(engine)
 Session = sessionmaker(bind=engine)
 TEST_DATE = datetime(2018, 6, 2)
 
@@ -25,12 +23,11 @@ TEST_DATE = datetime(2018, 6, 2)
 class BaseTestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        session = Session()
-        load_example_timetable_to_database(session, TEST_DATE)
+        Base.metadata.create_all(engine)
 
     @classmethod
     def tearDownClass(cls):
-        remove_example_timetable_from_database(engine)
+        drop_all_table(engine)
 
     def setUp(self):
         self.app = app
@@ -40,7 +37,15 @@ class BaseTestCase(unittest.TestCase):
         self.app.session.close()
 
 
-class TestCase_for_request_TRA_matching_train(BaseTestCase):
+class BaseTRATestCase(BaseTestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        session = Session()
+        load_example_timetable_to_database(session, TEST_DATE)
+
+
+class TestCase_for_request_TRA_matching_train(BaseTRATestCase):
     def check(self, correct_list, result):
         for i in range(len(result)):
             _l = result[i]
@@ -135,7 +140,7 @@ class TestCase_for_request_TRA_matching_train(BaseTestCase):
             self.check(correct_list, res)
 
 
-class TestCase_for_ask_TRA_question_states(BaseTestCase):
+class TestCase_for_ask_TRA_question_states(BaseTRATestCase):
     def tearDown(self):
         self.app.session.query(TRA_QuestionState).delete()
         self.app.session.commit()
@@ -217,3 +222,59 @@ class TestCase_for_ask_TRA_question_states(BaseTestCase):
             result = ask_TRA_question_states(event)
             for item in correct_items_in_result:
                 self.assertIn(item, result.text)
+
+
+class TestCase_for_follow_unfollow_join_joinning_event(BaseTestCase):
+
+    def clean_user_table(self):
+        self.app.session.query(User).delete()
+
+    def clean_group_table(self):
+        self.app.session.query(Group).delete()
+
+    def tearDown(self):
+        self.clean_user_table()
+        self.clean_group_table()
+        super().tearDown()
+
+    def test_follow_event_has_create_user(self):
+        mock_event = MagicMock()
+        mock_event.source.user_id = mock_event.reply_token = "123"
+        with self.app.app_context():
+            with self.assertRaises(LineBotApiError):
+                handle_follow_event(mock_event)
+        q = self.app.session.query(User).one()
+        self.assertEqual(q.user_id, "123")
+
+    def test_unfollow_event_has_remove_user(self):
+        user = User("123")
+        self.app.session.add(user)
+        mock_event = MagicMock()
+        mock_event.source.user_id = "123"
+        with self.app.app_context():
+            handle_unfollow_event(mock_event)
+        result = self.app.session.query(User).one()
+        self.assertEqual(result.user_id, "123")
+        self.assertFalse(result.following)
+        self.assertIsNotNone(result.unfollow_datetime)
+
+    def test_join_event_has_create_group(self):
+        mock_event = MagicMock()
+        mock_event.source.group_id = mock_event.reply_token = "123"
+        with self.app.app_context():
+            with self.assertRaises(LineBotApiError):
+                handle_join_event(mock_event)
+        q = self.app.session.query(Group).one()
+        self.assertEqual(q.group_id, "123")
+
+    def test_leave_event_has_remove_group(self):
+        group = Group("123")
+        self.app.session.add(group)
+        mock_event = MagicMock()
+        mock_event.source.group_id = "123"
+        with self.app.app_context():
+            handle_leave_event(mock_event)
+        result = self.app.session.query(Group).one()
+        self.assertEqual(result.group_id, "123")
+        self.assertFalse(result.joinning)
+        self.assertIsNotNone(result.leave_datetime)

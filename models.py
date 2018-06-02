@@ -106,3 +106,40 @@ class TRA_BuildingStatusOnDate(Base):
         self.assigned_date = assigned_date
         self.update_date = update_date
         self.status = status
+
+
+"""
+User and group might follow and then unfollow and follow and so on repeatedly,
+so don't make user_id and group_id unique.
+Consider these classes as a method of recording User's and Group's activity.
+"""
+class User(Base):
+    __tablename__ = 'user'
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(String(100))
+    following = Column(Boolean)
+    follow_datetime = Column(DateTime)
+    unfollow_datetime = Column(DateTime)
+
+    def __init__(self, user_id):
+        self.user_id = user_id
+        self.following = True
+        self.follow_datetime = datetime.now()
+        self.unfollow_datetime = None
+
+
+class Group(Base):
+    __tablename__ = 'group'
+
+    id = Column(Integer, primary_key=True)
+    group_id = Column(String(100))
+    joinning = Column(Boolean)
+    join_datetime = Column(DateTime)
+    leave_datetime = Column(DateTime)
+
+    def __init__(self, group_id):
+        self.group_id = group_id
+        self.joinning = True
+        self.join_datetime = datetime.now()
+        self.leave_datetime = None

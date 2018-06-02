@@ -9,7 +9,9 @@ from linebot.models import (
 from linebot.exceptions import LineBotApiError
 from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
 
-from models import TRA_QuestionState, TRA_TableEntry, TRA_TrainTimeTable
+from models import (
+    User, Group, TRA_QuestionState, TRA_TableEntry, TRA_TrainTimeTable,
+)
 from data import TRA_STATION_CODE2NAME
 from utils import pre_process_text
 
@@ -189,16 +191,50 @@ def handle_message_event(event):
         current_app.linebot.reply_message(event.reply_token, response)
 
 
+def unfollow_user(user_id):
+    q = current_app.session.query(User).filter_by(user_id=user_id) \
+                                       .filter_by(following=True).all()
+    for i in q:
+        i.following = False
+        i.unfollow_datetime = datetime.now()
+
+
 def handle_follow_event(event):
     text = "hi~ 我是火車時刻機器人 \U0001f686\n" \
            "> 輸入: 大寫或小寫T \n" \
            "就可以呼叫我喔～～\U0001f618\n"
     response = TextSendMessage(text=text)
+    unfollow_user(user_id=event.source.user_id)
+    new_user = User(event.source.user_id)
+    current_app.session.add(new_user)
     current_app.linebot.reply_message(event.reply_token, response)
 
 
-def handle_unfollow_event(ev):
-    pass
+def handle_unfollow_event(event):
+    unfollow_user(user_id=event.source.user_id)
+
+
+def leave_group(group_id):
+    q = current_app.session.query(Group).filter_by(group_id=group_id) \
+                           .filter_by(joinning=True).all()
+    for i in q:
+        i.joinning = False
+        i.leave_datetime = datetime.now()
+
+
+def handle_join_event(event):
+    text = "hi~ 我是火車時刻機器人 \U0001f686\n" \
+           "> 輸入: 大寫或小寫T \n" \
+           "就可以呼叫我喔～～\U0001f618\n"
+    response = TextSendMessage(text=text)
+    leave_group(event.source.group_id)
+    new_group = Group(event.source.group_id)
+    current_app.session.add(new_group)
+    current_app.linebot.reply_message(event.reply_token, response)
+
+
+def handle_leave_event(event):
+    leave_group(event.source.group_id)
 
 
 def handle_postback_event(event):
@@ -212,10 +248,14 @@ def handle_events(events):
     for ev in events:
         if isinstance(ev, MessageEvent):
             handle_message_event(ev)
-        elif isinstance(ev, FollowEvent) or isinstance(ev, JoinEvent):
+        elif isinstance(ev, FollowEvent):
             handle_follow_event(ev)
-        elif isinstance(ev, UnfollowEvent) or isinstance(ev, LeaveEvent):
+        elif isinstance(ev, UnfollowEvent):
             handle_unfollow_event(ev)
+        elif isinstance(ev, JoinEvent):
+            handle_join_event(ev)
+        elif isinstance(ev, LeaveEvent):
+            handle_leave_event(ev)
         elif isinstance(ev, PostbackEvent):
             handle_postback_event(ev)
         else:

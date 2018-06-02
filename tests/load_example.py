@@ -61,5 +61,5 @@ def load_example_timetable_to_database(session, date_input, train_type="TRA"):
     session.commit()
 
 
-def remove_example_timetable_from_database(engine):
+def drop_all_table(engine):
     Base.metadata.drop_all(engine)
