@@ -4,8 +4,6 @@ import time
 from flask import Flask
 from linebot import LineBotApi, WebhookParser
 from dotenv import load_dotenv
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 
 from views import register_url
 
@@ -35,11 +33,8 @@ except KeyError:
 # Register routing rule
 register_url(app)
 
-# Create sqlalchemy session
 time.sleep(5)  # wait for postgresql to start
-engine = create_engine(app.config["DATABASE_URI"])
-Session = sessionmaker(bind=engine)
-app.session = Session()
+
 # Base models will be created in routine container
 app.logger.info("START....")
 

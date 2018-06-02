@@ -49,7 +49,6 @@ def search_TRA_train(event):
     q_state = TRA_QuestionState(group=None if not hasattr(event.source, "group_id") else event.source.group_id,
                                 user=event.source.user_id)
     current_app.session.add(q_state)
-    current_app.session.commit()
     message = TextSendMessage(text="請輸入起程站")
     return message
 
@@ -113,7 +112,6 @@ def ask_TRA_question_states(event):
     except MultipleResultsFound:
         for i in qs.all():
             i.expired = True
-        current_app.session.commit()
         return None
     message = None
     if not qs.departure_station:
@@ -162,7 +160,6 @@ def ask_TRA_question_states(event):
         message = TextSendMessage(text=text)
     if message:
         qs.update = now
-        current_app.session.commit()
     return message
 
 
