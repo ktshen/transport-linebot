@@ -101,27 +101,31 @@ def request_TRA_matching_train(qs):
 
 def ask_TRA_question_states(event):
     now = datetime.now()
-    q = current_app.session.query(TRA_QuestionState).filter_by(expired=False) \
+    qs = current_app.session.query(TRA_QuestionState).filter_by(expired=False) \
         .filter_by(user=event.source.user_id) \
         .filter(TRA_QuestionState.update > (now - timedelta(hours=1)))
     if hasattr(event.source, "group_id"):
-        q = q.filter_by(group=event.source.group_id)
+        qs = qs.filter_by(group=event.source.group_id)
     try:
-        q = q.one()
+        qs = qs.one()
     except NoResultFound:
         return None
-
+    except MultipleResultsFound:
+        for i in qs.all():
+            i.expired = True
+        current_app.session.commit()
+        return None
     message = None
-    if not q.departure_station:
+    if not qs.departure_station:
         res = match_TRA_station_name(event.message.text)
         if res:
-            q.departure_station = res
+            qs.departure_station = res
             message = TextSendMessage(text="請輸入目的站")
-    elif not q.destination_station:
+    elif not qs.destination_station:
         res = match_TRA_station_name(event.message.text)
-        if res and res != q.departure_station:
-            q.destination_station = res
-            title = '請選擇搭乘時間: {0} → {1}'.format(q.departure_station, q.destination_station)
+        if res and res != qs.departure_station:
+            qs.destination_station = res
+            title = '請選擇搭乘時間: {0} → {1}'.format(qs.departure_station, qs.destination_station)
             message = TemplateSendMessage(
                 alt_text='請選擇搭乘時間',
                 template=ButtonsTemplate(
@@ -133,19 +137,19 @@ def ask_TRA_question_states(event):
                     ]
                 )
             )
-        elif res == q.departure_station:
+        elif res == qs.departure_station:
             message = create_error_text_message(
                 text="輸入的目的站與起程站皆是{0}，請重新輸入有效目的站".format(res))
-    elif not q.departure_time and isinstance(event, PostbackEvent):
+    elif not qs.departure_time and isinstance(event, PostbackEvent):
         dt = event.postback.params["datetime"]
         dt = datetime.strptime(dt, "%Y-%m-%dT%H:%M")
-        q.departure_time = dt
-        suitable_trains = request_TRA_matching_train(q)
+        qs.departure_time = dt
+        suitable_trains = request_TRA_matching_train(qs)
         if not suitable_trains:
             text = "無適合班次"
         else:
             text = "適合班次如下  {0} → {1} \n" \
-                   "車次   車種  開車時間  抵達時間\n".format(q.departure_station, q.destination_station)
+                   "車次   車種  開車時間  抵達時間\n".format(qs.departure_station, qs.destination_station)
             fmt = "{0:0>4}  {1:^2}     {2}        {3}\n"
             for _l in suitable_trains:
                 text = text + fmt.format(_l[0].train.train_no, _l[0].train.train_type,
@@ -157,7 +161,7 @@ def ask_TRA_question_states(event):
                     break
         message = TextSendMessage(text=text)
     if message:
-        q.update = now
+        qs.update = now
         current_app.session.commit()
     return message
 

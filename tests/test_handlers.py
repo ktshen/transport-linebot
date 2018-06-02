@@ -1,20 +1,28 @@
 import unittest
+from unittest.mock import MagicMock, Mock
 import os
+from datetime import datetime
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from .load_example import load_example_timetable_to_database, remove_example_from_database
+from linebot.models import PostbackEvent
+from .load_example import load_example_timetable_to_database, remove_example_timetable_from_database
 
-from models import Base
-from handlers import *
+from models import (
+    Base, TRA_QuestionState, TRA_BuildingStatusOnDate, TRA_Train,
+    TableEntry, TRA_TrainTimeTable
+)
+from handlers import (
+    request_TRA_matching_train, ask_TRA_question_states
+)
 from app import app
 
-engine = create_engine(os.environ["DATABASE_URI"])
+engine = create_engine(os.environ["TESTING_DATABASE_URI"])
 Base.metadata.create_all(engine)
 Session = sessionmaker(bind=engine)
 TEST_DATE = datetime(2018, 6, 2)
 
 
-class TestCase_for_request_TRA_matching_train(unittest.TestCase):
+class BaseTestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         session = Session()
@@ -22,14 +30,17 @@ class TestCase_for_request_TRA_matching_train(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        session = Session()
-        load_example_timetable_to_database(session, TEST_DATE)
-        remove_example_from_database(session, TEST_DATE)
+        remove_example_timetable_from_database(engine)
 
     def setUp(self):
         self.app = app
         self.app.session = Session()
 
+    def tearDown(self):
+        self.app.session.close()
+
+
+class TestCase_for_request_TRA_matching_train(BaseTestCase):
     def check(self, correct_list, result):
         for i in range(len(result)):
             _l = result[i]
@@ -122,3 +133,87 @@ class TestCase_for_request_TRA_matching_train(unittest.TestCase):
                                    departure_time=datetime(2018, 6, 2, 6, 0))
             res = request_TRA_matching_train(qs)
             self.check(correct_list, res)
+
+
+class TestCase_for_ask_TRA_question_states(BaseTestCase):
+    def tearDown(self):
+        self.app.session.query(TRA_QuestionState).delete()
+        self.app.session.commit()
+        super().tearDown()
+
+    def test_multiple_question_states_exists(self):
+        mock_event = MagicMock()
+        mock_event.source.user_id = mock_event.source.group_id = user_id = group = "123"
+        # Create two questions states
+        qs_1 = TRA_QuestionState(group=group, user=user_id)
+        self.app.session.add(qs_1)
+        qs_2 = TRA_QuestionState(group=group, user=user_id)
+        self.app.session.add(qs_2)
+        with self.app.app_context():
+            result = ask_TRA_question_states(mock_event)
+            # Should return None and expire all question states
+            self.assertIsNone(result)
+            q = self.app.session.query(TRA_QuestionState).all()
+            self.assertEqual(len(q), 2)
+            for i in q:
+                self.assertEqual(i.expired, True)
+
+    def test_message_choosing_departure_station(self):
+        mock_event = MagicMock()
+        mock_event.source.user_id = mock_event.source.group_id = user_id = group = "123"
+        mock_event.message.text = "新竹"
+        qs_1 = TRA_QuestionState(group=group, user=user_id)
+        self.app.session.add(qs_1)
+        with self.app.app_context():
+            result = ask_TRA_question_states(mock_event)
+            self.assertEqual(result.text, "請輸入目的站")
+
+    def test_message_choosing_destination_station(self):
+        mock_event = MagicMock()
+        mock_event.source.user_id = mock_event.source.group_id = user_id = group = "123"
+        mock_event.message.text = "高雄"
+        qs_1 = TRA_QuestionState(group=group, user=user_id,
+                                 departure_station="新竹")
+        self.app.session.add(qs_1)
+        with self.app.app_context():
+            result = ask_TRA_question_states(mock_event)
+            self.assertEqual(result.alt_text, "請選擇搭乘時間")
+
+    def test_destination_station_is_same_with_departure_station(self):
+        mock_event = MagicMock()
+        mock_event.source.user_id = mock_event.source.group_id = user_id = group = "123"
+        mock_event.message.text = "新竹"
+        qs_1 = TRA_QuestionState(group=group, user=user_id,
+                                 departure_station="新竹")
+        self.app.session.add(qs_1)
+        with self.app.app_context():
+            result = ask_TRA_question_states(mock_event)
+            self.assertEqual(result.text, "輸入的目的站與起程站皆是新竹，請重新輸入有效目的站")
+
+    def test_message_choosing_datetime(self):
+        correct_items_in_result = ['0051', '莒光', '07:19', '11:16', '0103', '自強', '07:40', '11:32', '0105', '自強',
+                                   '08:14', '12:10', '0507', '莒光', '08:53', '14:15', '0113', '自強', '09:38', '13:21',
+                                   '0115', '自強', '10:13', '13:53', '0511', '莒光', '10:54', '15:49', '0117', '自強',
+                                   '11:05', '14:51', '0121', '自強', '12:10', '16:00', '0513', '莒光', '12:49', '18:01',
+                                   '0123', '自強', '13:10', '16:50', '0125', '自強', '14:13', '17:50', '0129', '自強',
+                                   '15:08', '18:49', '0561', '莒光', '15:20', '20:38', '0133', '自強', '15:33', '18:15',
+                                   '0135', '自強', '16:10', '19:54', '0175', '自強', '17:10', '20:58', '0521', '莒光',
+                                   '17:46', '22:59', '0139', '自強', '18:10', '21:51', '0141', '自強', '18:40', '22:24',
+                                   '0145', '自強', '19:20', '23:06', '0149', '自強', '19:56', '23:47', '0181', '自強',
+                                   '20:37', '00:17']
+
+        event = PostbackEvent()
+        mock_source = MagicMock()
+        mock_source.user_id = mock_source.group_id = user_id = group = "123"
+        event.source = mock_source
+        mock_postback = MagicMock()
+        mock_postback.params = {"datetime":"2018-06-02T07:00"}
+        event.postback = mock_postback
+        qs_1 = TRA_QuestionState(group=group, user=user_id,
+                                 departure_station="新竹",
+                                 destination_station="高雄")
+        self.app.session.add(qs_1)
+        with self.app.app_context():
+            result = ask_TRA_question_states(event)
+            for item in correct_items_in_result:
+                self.assertIn(item, result.text)

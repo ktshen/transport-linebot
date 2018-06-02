@@ -3,8 +3,8 @@ import os
 from build_database import (
     request_TRA_all_train_no_by_date, request_TRA_train_no_timetable_by_date,
     build_TRA_traintimetable, check_TRA_building_status_by_date,
-    remove_TRA_timetable_by_date
 )
+from models import Base
 
 FILENAME_FORMAT = "{0}-all-{1}-trains-timetable.pickle"
 
@@ -61,6 +61,5 @@ def load_example_timetable_to_database(session, date_input, train_type="TRA"):
     session.commit()
 
 
-def remove_example_from_database(session, date_input, train_type="TRA"):
-    if train_type == "TRA":
-        remove_TRA_timetable_by_date(date_input, session)
+def remove_example_timetable_from_database(engine):
+    Base.metadata.drop_all(engine)
