@@ -13,6 +13,7 @@ keys_candidates = list()
 with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), "ptx_keys.txt"), "r") as infile:
     ID = KEY = ""
     for line in infile:
+        line = line.rstrip('\n')
         if line and not ID:
             ID = line
         elif line and not KEY:
