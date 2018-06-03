@@ -11,8 +11,9 @@ from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
 
 from models import (
     User, Group, TRA_QuestionState, TRA_TableEntry, TRA_TrainTimeTable,
+    THSR_QuestionState, THSR_TableEntry, THSR_TrainTimeTable
 )
-from data import TRA_STATION_CODE2NAME
+from data import TRA_STATION_CODE2NAME, THSR_STATION_CODE2NAME
 from utils import pre_process_text
 
 
@@ -20,6 +21,64 @@ def create_error_text_message(text=""):
     if not text:
         text = "系統發生錯誤，請稍後再試，謝謝～"
     return TextSendMessage(text=text)
+
+
+def request_matching_train(qs, train_type):
+    """
+    Since the algorithm is same for both TRA and THSR,
+    I believe this function can be an independent function
+    """
+    if train_type == "TRA":
+        timetableclass = TRA_TrainTimeTable
+        table_entry_class = TRA_TableEntry
+    elif train_type == "THSR":
+        timetableclass = THSR_TrainTimeTable
+        table_entry_class = THSR_TableEntry
+
+    q_1 = current_app.session.query(timetableclass).join("entries") \
+                     .filter(table_entry_class.station_name == qs.departure_station) \
+                     .filter(table_entry_class.departure_time > qs.departure_time)
+    q_2 = current_app.session.query(timetableclass).join("entries") \
+                     .filter(table_entry_class.station_name == qs.destination_station) \
+                     .filter(table_entry_class.arrival_time > qs.departure_time)
+    q = q_1.intersect(q_2)
+    suitable_trains = list()
+    for t in q:
+        dep_q = current_app.session.query(table_entry_class) \
+                           .filter(table_entry_class.timetable == t) \
+                           .filter_by(station_name=qs.departure_station) \
+                           .filter(table_entry_class.departure_time > qs.departure_time) \
+                           .order_by(table_entry_class.departure_time)
+        try:
+            dep_entry = dep_q.one()
+        except MultipleResultsFound:
+            dep_entry = dep_q.first()
+        dest_q = current_app.session.query(table_entry_class) \
+                            .filter(table_entry_class.timetable == t) \
+                            .filter_by(station_name=qs.destination_station) \
+                            .filter(dep_entry.departure_time < table_entry_class.arrival_time) \
+                            .order_by(table_entry_class.departure_time)
+        try:
+            dest_entry = dest_q.one()
+        except MultipleResultsFound:
+            dest_entry = dest_q.first()
+        except NoResultFound:
+            continue
+        suitable_trains.append([t, dep_entry, dest_entry])
+    suitable_trains = sorted(suitable_trains, key=lambda x: x[1].departure_time)
+    q.expired = True
+    return suitable_trains
+
+
+def expire_user_all_questionstates(user_id):
+    old_states = current_app.session.query(TRA_QuestionState).filter_by(expired=False) \
+                            .filter_by(user=user_id).all()
+    for s in old_states:
+        s.expired = True
+    old_states = current_app.session.query(THSR_QuestionState).filter_by(expired=False) \
+        .filter_by(user=user_id).all()
+    for s in old_states:
+        s.expired = True
 
 
 def request_main_menu():
@@ -44,10 +103,7 @@ def request_main_menu():
 
 
 def search_TRA_train(event):
-    old_states = current_app.session.query(TRA_QuestionState).filter_by(expired=False) \
-        .filter_by(user=event.source.user_id).all()
-    for s in old_states:
-        s.expired = True
+    expire_user_all_questionstates(event.source.user_id)
     q_state = TRA_QuestionState(group=None if not hasattr(event.source, "group_id") else event.source.group_id,
                                 user=event.source.user_id)
     current_app.session.add(q_state)
@@ -65,39 +121,7 @@ def match_TRA_station_name(text):
 
 
 def request_TRA_matching_train(qs):
-    q_1 = current_app.session.query(TRA_TrainTimeTable).join("entries") \
-        .filter(TRA_TableEntry.station_name == qs.departure_station) \
-        .filter(TRA_TableEntry.departure_time > qs.departure_time)
-    q_2 = current_app.session.query(TRA_TrainTimeTable).join("entries") \
-        .filter(TRA_TableEntry.station_name == qs.destination_station) \
-        .filter(TRA_TableEntry.arrival_time > qs.departure_time)
-    q = q_1.intersect(q_2)
-    suitable_trains = list()
-    for t in q:
-        dep_q = current_app.session.query(TRA_TableEntry) \
-            .filter(TRA_TableEntry.timetable == t) \
-            .filter_by(station_name=qs.departure_station) \
-            .filter(TRA_TableEntry.departure_time > qs.departure_time) \
-            .order_by(TRA_TableEntry.departure_time)
-        try:
-            dep_entry = dep_q.one()
-        except MultipleResultsFound:
-            dep_entry = dep_q.first()
-        dest_q = current_app.session.query(TRA_TableEntry) \
-            .filter(TRA_TableEntry.timetable == t) \
-            .filter_by(station_name=qs.destination_station) \
-            .filter(dep_entry.departure_time < TRA_TableEntry.arrival_time) \
-            .order_by(TRA_TableEntry.departure_time)
-        try:
-            dest_entry = dest_q.one()
-        except MultipleResultsFound:
-            dest_entry = dest_q.first()
-        except NoResultFound:
-            continue
-        suitable_trains.append([t, dep_entry, dest_entry])
-    suitable_trains = sorted(suitable_trains, key=lambda x: x[1].departure_time)
-    q.expired = True
-    return suitable_trains
+    return request_matching_train(qs, "TRA")
 
 
 def ask_TRA_question_states(event):
@@ -165,18 +189,108 @@ def ask_TRA_question_states(event):
     return message
 
 
+def search_THSR_train(event):
+    expire_user_all_questionstates(event.source.user_id)
+    q_state = THSR_QuestionState(group=None if not hasattr(event.source, "group_id") else event.source.group_id,
+                                 user=event.source.user_id)
+    current_app.session.add(q_state)
+    message = TextSendMessage(text="請輸入起程站")
+    return message
+
+
+def match_THSR_station_name(text):
+    stations_name = THSR_STATION_CODE2NAME.values()
+    text = pre_process_text(text)
+    for s in stations_name:
+        if re.match(s, text):
+            return s
+    return None
+
+
+def request_THSR_matching_train(qs):
+    return request_matching_train(qs, "THSR")
+
+
+def ask_THSR_question_states(event):
+    now = datetime.now()
+    qs = current_app.session.query(THSR_QuestionState).filter_by(expired=False) \
+                    .filter_by(user=event.source.user_id) \
+                    .filter(THSR_QuestionState.update > (now - timedelta(hours=1)))
+    if hasattr(event.source, "group_id"):
+        qs = qs.filter_by(group=event.source.group_id)
+    try:
+        qs = qs.one()
+    except NoResultFound:
+        return None
+    except MultipleResultsFound:
+        for i in qs.all():
+            i.expired = True
+        return None
+    message = None
+    if not qs.departure_station:
+        res = match_THSR_station_name(event.message.text)
+        if res:
+            qs.departure_station = res
+            message = TextSendMessage(text="請輸入目的站")
+    elif not qs.destination_station:
+        res = match_THSR_station_name(event.message.text)
+        if res and res != qs.departure_station:
+            qs.destination_station = res
+            title = '請選擇搭乘時間: {0} → {1}'.format(qs.departure_station, qs.destination_station)
+            message = TemplateSendMessage(
+                alt_text='請選擇搭乘時間',
+                template=ButtonsTemplate(
+                    title=title,
+                    text='點擊選擇',
+                    actions=[
+                        DatetimePickerTemplateAction(label='搭乘時間', data='datetime_postback',
+                                                     mode='datetime'),
+                    ]
+                )
+            )
+        elif res == qs.departure_station:
+            message = create_error_text_message(
+                text="輸入的目的站與起程站皆是{0}，請重新輸入有效目的站".format(res))
+    elif not qs.departure_time and isinstance(event, PostbackEvent):
+        dt = event.postback.params["datetime"]
+        dt = datetime.strptime(dt, "%Y-%m-%dT%H:%M")
+        qs.departure_time = dt
+        suitable_trains = request_THSR_matching_train(qs)
+        if not suitable_trains:
+            text = "無適合班次"
+        else:
+            text = "適合班次如下  {0} → {1} \n" \
+                   "車次   開車時間  抵達時間\n".format(qs.departure_station, qs.destination_station)
+            fmt = "{0:0>4}    {1}       {2}\n"
+            for _l in suitable_trains:
+                text = text + fmt.format(_l[0].train.train_no,
+                                         _l[1].departure_time.strftime("%H:%M"),
+                                         _l[2].arrival_time.strftime("%H:%M"))
+                # Total word number of a post is limited
+                if len(text) > 1500:
+                    text = text + "More...\n"
+                    break
+        message = TextSendMessage(text=text)
+    if message:
+        qs.update = now
+    return message
+
+
 def match_text_and_assign(event):
     """
     Assigned function should return a Message Object
     """
-    res = None
     text = event.message.text
-    if re.fullmatch(r'[ ]*([tT]+|查(交通|時刻表|班次)?)', text):
+    if re.fullmatch(r'^[ ]*([tT]+|查(交通|時刻表|班次)?)$', text):
         res = request_main_menu()
-    elif re.fullmatch(r'[ ]*查?(台鐵|TRA)', text):
+    elif re.fullmatch(r'^[ ]*查?([臺台]鐵|TRA)$', text):
         res = search_TRA_train(event)
+    elif re.fullmatch(r'^[ ]*查?(高鐵|THSR)$', text):
+        res = search_THSR_train(event)
     else:
         res = ask_TRA_question_states(event)
+        if not res:
+            res = ask_THSR_question_states(event)
     return res
 
 
@@ -239,6 +353,8 @@ def handle_leave_event(event):
 
 def handle_postback_event(event):
     response = ask_TRA_question_states(event)
+    if not response:
+        response = ask_THSR_question_states(event)
 
     if response is not None:
         current_app.linebot.reply_message(event.reply_token, response)

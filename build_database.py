@@ -4,12 +4,18 @@ from utils import request_MOTC, convert_date_to_string
 from datetime import datetime, date, timedelta
 from sqlalchemy.orm.exc import NoResultFound
 
-from models import TRA_Train, TRA_TrainTimeTable, TRA_TableEntry, TRA_BuildingStatusOnDate
-from data import TRA_STATION_CODE2NAME, TRA_TRAINTYPE_CODE2NAME
+from models import (
+    TRA_Train, TRA_TrainTimeTable, TRA_TableEntry, TRA_BuildingStatusOnDate,
+    THSR_Train, THSR_TrainTimeTable, THSR_TableEntry, THSR_BuildingStatusOnDate
+)
+from data import (
+    TRA_STATION_CODE2NAME, TRA_TRAINTYPE_CODE2NAME, THSR_STATION_CODE2NAME
+)
 
 
-URL_FOR_ALL_TRAIN_NO_BY_DATE = "http://ptx.transportdata.tw/MOTC/v2/Rail/TRA/DailyTrainInfo/TrainDate/{0}"
-URL_FOR_TRAIN_NO_TIMETABLE_BY_DATE = "http://ptx.transportdata.tw/MOTC/v2/Rail/TRA/DailyTimetable/TrainNo/{0}/TrainDate/{1}"
+URL_FOR_ALL_TRA_TRAIN_NO_BY_DATE = "http://ptx.transportdata.tw/MOTC/v2/Rail/TRA/DailyTrainInfo/TrainDate/{0}"
+URL_FOR_TRA_TRAIN_NO_TIMETABLE_BY_DATE = "http://ptx.transportdata.tw/MOTC/v2/Rail/TRA/DailyTimetable/TrainNo/{0}/TrainDate/{1}"
+URL_FOR_ALL_THSR_TRAIN_NO_AND_TIMETABLE = "http://ptx.transportdata.tw/MOTC/v2/Rail/THSR/DailyTimetable/TrainDate/{0}"
 
 
 class ResponseMessage(object):
@@ -20,7 +26,7 @@ class ResponseMessage(object):
     status_dict = {
         0: "OK",
         1: "伺服端無法與平台連接",    # assign this value when an error happens in request_MOTC
-        2: "沒有相關資料",           # when there is no result in response (empty)
+        2: "取得資訊為空白",         # when there is no result in response (empty)
         3: "建構資料中，稍後再試",    # When a process has already been building the data
         9: "不知名錯誤",             # Unrecognised Error
         10: "",                     # Self defined Error
@@ -41,7 +47,7 @@ class ResponseMessage(object):
 
 def request_TRA_all_train_no_by_date(date_input):
     date_string = convert_date_to_string(date_input)
-    url = URL_FOR_ALL_TRAIN_NO_BY_DATE.format(date_string)
+    url = URL_FOR_ALL_TRA_TRAIN_NO_BY_DATE.format(date_string)
     try:
         resp = request_MOTC(url)
     except Exception as e:
@@ -59,20 +65,23 @@ def request_TRA_all_train_no_by_date(date_input):
     return train_no_list
 
 
-def request_TRA_train_no_timetable_by_date(train_no, date_input):
+def request_TRA_train_timetable_by_date(train_no, date_input):
     """
     :return: the dictionary in the response or a error ResponseType
     """
     date_string = convert_date_to_string(date_input)
-    url = URL_FOR_TRAIN_NO_TIMETABLE_BY_DATE.format(train_no, date_string)
+    url = URL_FOR_TRA_TRAIN_NO_TIMETABLE_BY_DATE.format(train_no, date_string)
     try:
         resp = request_MOTC(url)
     except Exception as e:
         traceback.print_exc(file=sys.stdout)
         return ResponseMessage(1)
     resp = resp.json()
+
     if not resp:
         return ResponseMessage(2)
+    elif "message" in resp:
+        return ResponseMessage(10, resp["message"])
     return resp[0]
 
 
@@ -90,7 +99,7 @@ def remove_TRA_timetable_by_date(date_input, session):
         return True
     for table in q:
         session.delete(table)
-    update_TRA_building_status(date_input, 4, session)
+    update_TRA_building_status(date_input, 3, session)
 
 
 def create_TRA_building_status_by_date(date_input, status, session):
@@ -186,12 +195,12 @@ def build_TRA_traintimetable(table_input, session, date_input):
     update_TRA_building_status(date_input, 2, session)
 
 
-def build_TRA_Database_by_date(date_input, session, ignore_built=False):
+def build_TRA_database_by_date(date_input, session, build_anyway=False):
     """
     Call this function to build Time Table for all trains specified by date
     :param date_input: date object
-    :param ignore_built: if ignore_built is True, then it will build the database anyway even if the database has already
-    built on that day
+    :param build_anyway: if build_anyway is True, then it will build the database anyway even if the database has
+    already built on that day
     :return ResponseMessage
     """
     try:
@@ -201,7 +210,7 @@ def build_TRA_Database_by_date(date_input, session, ignore_built=False):
             raise TypeError("Need a date object.")
         # This will create a new TRA_BuildingStatusOnDate with status 0 if not exists
         building_status = check_TRA_building_status_by_date(date_input, session)
-        if not ignore_built and building_status == 2:
+        if not build_anyway and building_status == 2:
             return ResponseMessage(0)
         # We assume that only one process is running all the time. So there is no competitive problem
         # The status is 1 because it is terminated while running previously
@@ -214,18 +223,184 @@ def build_TRA_Database_by_date(date_input, session, ignore_built=False):
             return response
         else:
             train_no_list = response
-
         # Remove the older data and build the database
         remove_TRA_timetable_by_date(date_input, session)
         for train_no in train_no_list:
-            response = request_TRA_train_no_timetable_by_date(train_no, date_input)
+            response = request_TRA_train_timetable_by_date(train_no, date_input)
             if isinstance(response, ResponseMessage):
                 return response
-            train_timetable = response
-            build_TRA_traintimetable(train_timetable, session, date_input)
+            build_TRA_traintimetable(response, session, date_input)
         session.commit()
         return ResponseMessage(0)
     except Exception as e:
         remove_TRA_timetable_by_date(date_input, session)
+        traceback.print_exc(file=sys.stdout)
+        return ResponseMessage(9)
+
+
+################################### THSR below ##################################
+
+
+def create_THSR_building_status_by_date(date_input, status, session):
+    status_object = THSR_BuildingStatusOnDate(assigned_date=date_input,
+                                              update_date=datetime.now().date(),
+                                              status=status)
+    session.add(status_object)
+    session.commit()
+
+
+def check_THSR_building_status_by_date(date_input, session):
+    try:
+        q = session.query(THSR_BuildingStatusOnDate).filter_by(assigned_date=date_input).one()
+    except NoResultFound:
+        create_THSR_building_status_by_date(date_input, 0, session)
+        return 0
+    return q.status
+
+
+def update_THSR_building_status(date_input, status, session):
+    try:
+        status_object = session.query(THSR_BuildingStatusOnDate).filter_by(assigned_date=date_input).one()
+    except NoResultFound:
+        create_THSR_building_status_by_date(date_input, status, session)
+        return True
+    status_object.status = status
+    status_object.update_date = datetime.now().date()
+    session.commit()
+
+
+def remove_THSR_timetable_by_date(date_input, session):
+    q = session.query(THSR_TrainTimeTable).filter_by(date=date_input).all()
+    if not q:
+        return True
+    for table in q:
+        session.delete(table)
+    update_THSR_building_status(date_input, 3, session)
+
+
+def request_THSR_all_train_timetable(date_input):
+    """
+    :return: a list of RailDailyTimetable
+    """
+    date_string = convert_date_to_string(date_input)
+    url = URL_FOR_ALL_THSR_TRAIN_NO_AND_TIMETABLE.format(date_string)
+    try:
+        resp = request_MOTC(url)
+    except:
+        traceback.print_exc(file=sys.stdout)
+        return ResponseMessage(1)
+    resp = resp.json()
+    if not resp:
+        return ResponseMessage(2)
+    elif "message" in resp:
+        return ResponseMessage(10, resp["message"])
+    return resp
+
+
+def convert_THSR_station_code2name(station_id):
+    return THSR_STATION_CODE2NAME[station_id]
+
+
+def build_THSR_traintimetable(table_input, session, date_input):
+    """
+    table_input form:
+    RailDailyTimetable {
+        TrainDate (string): 行駛日期(格式: yyyy:MM:dd) ,
+        DailyTrainInfo (RailDailyTrainInfo): 車次資料 ,
+        StopTimes (Array[RailStopTime]): 停靠時間資料 ,
+        UpdateTime (DateTime): 資料更新日期時間
+    }
+    RailDailyTrainInfo {
+        TrainNo (string): 車次代碼 ,
+        Direction (string): 行駛方向 = ['0: 南下', '1: 北上'],
+        StartingStationID (string, optional): 列車起點車站代號 ,
+        StartingStationName (NameType, optional): 列車起點車站名稱 ,
+        EndingStationID (string, optional): 列車終點車站代號 ,
+        EndingStationName (NameType, optional): 列車終點車站名稱 ,
+        Note (NameType, optional): 附註說明
+    }
+    RailStopTime {
+        StopSequence (integer): 跑法站序(由1開始) ,
+        StationID (string): 車站代碼 ,
+        StationName (NameType): 車站名稱 ,
+        ArrivalTime (string, optional): 到站時間(格式: HH:mm:ss) ,
+        DepartureTime (string): 離站時間(格式: HH:mm:ss)
+    }
+    """
+    # Create TRA_Train if not exist
+    train_no = table_input["DailyTrainInfo"]["TrainNo"]
+    try:
+        train = session.query(THSR_Train).filter_by(train_no=train_no).one()
+    except NoResultFound:
+        train = THSR_Train(train_no)
+        session.add(train)
+    # Update THSR_BuildingStatusOnDate for the date with status building
+    update_THSR_building_status(date_input, 1, session)
+    # Create THSR_TrainTimeTable
+    timetable = THSR_TrainTimeTable(date_input)
+    timetable.train = train
+
+    # Create a list of TimeTableEntry
+    cross_day = False
+    previous_departure_time = None
+    for entry in table_input["StopTimes"]:
+        try:
+            station_name = convert_THSR_station_code2name(entry["StationID"])
+        except KeyError:
+            print("Can't convert station_code: {}".format(entry["StationID"]))
+            continue
+        departure_time = datetime.strptime(entry["DepartureTime"], "%H:%M").time()
+        try:
+            arrival_time = datetime.strptime(entry["ArrivalTime"], "%H:%M").time()
+        except KeyError:
+            arrival_time = departure_time
+
+        if cross_day:
+            arrival_date = departure_date = date_input + timedelta(1)
+        elif departure_time < arrival_time:
+            cross_day = True
+            arrival_date = date_input
+            departure_date = date_input + timedelta(1)
+        elif previous_departure_time and arrival_time < previous_departure_time:
+            cross_day = True
+            arrival_date = departure_date = date_input + timedelta(1)
+        else:
+            arrival_date = departure_date = date_input
+
+        table_entry = THSR_TableEntry(
+            station_name=station_name,
+            arrival_time=datetime.combine(arrival_date, arrival_time),
+            departure_time=datetime.combine(departure_date, departure_time)
+        )
+        timetable.entries.append(table_entry)
+        previous_departure_time = departure_time
+    session.add(timetable)
+    update_THSR_building_status(date_input, 2, session)
+
+
+def build_THSR_database_by_date(date_input, session, build_anyway=False):
+    try:
+        if isinstance(date_input, datetime):
+            date_input = date_input.date()
+        elif not isinstance(date_input, date):
+            raise TypeError("Need a date object.")
+        # This will create a new THSR_BuildingStatusOnDate with status 0 if not exists
+        building_status = check_THSR_building_status_by_date(date_input, session)
+        if not build_anyway and building_status == 2:
+            return ResponseMessage(0)
+        # We assume that only one process is running all the time. So there is no competitive problem
+        # so if the status is 1, it is probably terminated while running previously
+        # Remove the older data and build the database
+        remove_THSR_timetable_by_date(date_input, session)
+        # Get a list of train no on specified date
+        response = request_THSR_all_train_timetable(date_input)
+        if isinstance(response, ResponseMessage):
+            return response
+        for train in response:
+            build_THSR_traintimetable(train, session, date_input)
+        session.commit()
+        return ResponseMessage(0)
+    except:
+        remove_THSR_timetable_by_date(date_input, session)
         traceback.print_exc(file=sys.stdout)
         return ResponseMessage(9)

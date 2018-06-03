@@ -1,35 +1,50 @@
 import pickle
 import os
 from build_database import (
-    request_TRA_all_train_no_by_date, request_TRA_train_no_timetable_by_date,
+    ResponseMessage, request_TRA_all_train_no_by_date, request_TRA_train_timetable_by_date,
     build_TRA_traintimetable, check_TRA_building_status_by_date,
+    request_THSR_all_train_timetable, check_THSR_building_status_by_date,
+    build_THSR_traintimetable
 )
 from models import Base
 
 FILENAME_FORMAT = "{0}-all-{1}-trains-timetable.pickle"
 
 
-def create_new_TRA_example_by_date(date_input):
-    outfile = open("tests/" + FILENAME_FORMAT.format(date_input.strftime("%Y-%m-%d"), "TRA"), "wb")
+def create_new_TRA_example_by_date(date_input, file_path):
+    outfile = open(file_path, "wb")
     all_train = request_TRA_all_train_no_by_date(date_input)
     try:
         for tn in all_train:
-            timetable = request_TRA_train_no_timetable_by_date(tn, date_input)
-            pickle.dump(timetable, outfile, pickle.HIGHEST_PROTOCOL)
+            timetable = request_TRA_train_timetable_by_date(tn, date_input)
+            if not isinstance(timetable, ResponseMessage):
+                pickle.dump(timetable, outfile, pickle.HIGHEST_PROTOCOL)
     except Exception as e:
         print(e)
-        outfile.close()
+    outfile.close()
+
+
+def create_new_THSR_example_by_date(date_input, file_path):
+    outfile = open(file_path, "wb")
+    all_train = request_THSR_all_train_timetable(date_input)
+    try:
+        for tb in all_train:
+            pickle.dump(tb, outfile, pickle.HIGHEST_PROTOCOL)
+    except Exception as e:
+        print(e)
+    outfile.close()
 
 
 class TimeTableExampleLoader(object):
     def __init__(self, date_input, train_type="TRA"):
-        filename = FILENAME_FORMAT.format(date_input.strftime("%Y-%m-%d"),
-                                          train_type)
+        filename = FILENAME_FORMAT.format(date_input.strftime("%Y-%m-%d"), train_type)
         real_path = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                                  filename)
         if not os.path.exists(real_path):
             if train_type == "TRA":
-                create_new_TRA_example_by_date(date_input)
+                create_new_TRA_example_by_date(date_input, real_path)
+            elif train_type == "THSR":
+                create_new_THSR_example_by_date(date_input, real_path)
         self.infile = open(real_path, "rb")
 
     def __enter__(self):
@@ -58,6 +73,11 @@ def load_example_timetable_to_database(session, date_input, train_type="TRA"):
         check_TRA_building_status_by_date(date_input, session)
         for timetable in loader:
             build_TRA_traintimetable(timetable, session, date_input)
+
+    elif train_type == "THSR":
+        check_THSR_building_status_by_date(date_input, session)
+        for timetable in loader:
+            build_THSR_traintimetable(timetable, session, date_input)
     session.commit()
 
 

@@ -19,9 +19,7 @@ class TableEntry(object):
         self.departure_time = departure_time
 
 
-class TRA_QuestionState(Base):
-    __tablename__ = 'tra_questionstate'
-
+class QuestionState(object):
     id = Column(Integer, primary_key=True)
     group = Column(String(100))
     user = Column(String(100))
@@ -41,8 +39,30 @@ class TRA_QuestionState(Base):
         self.expired = expired
         self.update = datetime.now()
 
+
+class BuildingStatusOnDate(object):
+    """
+        :param assigned_date : the date that this class is responsible for
+        :param update_date : the latest update date
+        :param status : 0: not built yet, 1: building, 2: built, 3: remove
+    """
+
+    id = Column(Integer, primary_key=True)
+    assigned_date = Column(Date, unique=True)
+    update_date = Column(Date)
+    status = Column(Integer)
+
+    def __init__(self, assigned_date, update_date=None, status=0):
+        self.assigned_date = assigned_date
+        self.update_date = update_date
+        self.status = status
+
+
+class TRA_QuestionState(QuestionState, Base):
+    __tablename__ = 'tra_questionstate'
+
     def __repr__(self):
-        return "QuestionState's id: {}".format(self.id)
+        return "TRA_QuestionState's id: {}".format(self.id)
 
 
 class TRA_Train(Base):
@@ -89,23 +109,52 @@ class TRA_TableEntry(TableEntry, Base):
                                              order_by='TRA_TableEntry.arrival_time'))
 
 
-class TRA_BuildingStatusOnDate(Base):
-    """
-    :param assigned_date : the date that this class is responsible for
-    :param update_date : the latest update date
-    :param status : 0: not built yet, 1: building, 2: built, 3: remove
-    """
+class TRA_BuildingStatusOnDate(BuildingStatusOnDate, Base):
     __tablename__ = "tra_dataupdatestatus"
 
-    id = Column(Integer, primary_key=True)
-    assigned_date = Column(Date, unique=True)
-    update_date = Column(Date)
-    status = Column(Integer)
 
-    def __init__(self, assigned_date, update_date=None, status=0):
-        self.assigned_date = assigned_date
-        self.update_date = update_date
-        self.status = status
+class THSR_QuestionState(QuestionState, Base):
+    __tablename__ = 'thsr_questionstate'
+
+    def __repr__(self):
+        return "THSR_QuestionState's id: {}".format(self.id)
+
+
+class THSR_Train(Base):
+    __tablename__ = 'thsr_train'
+
+    id = Column(Integer, primary_key=True)
+    train_no = Column(String(10), unique=True)
+
+    def __init__(self, train_no):
+        self.train_no = train_no
+
+
+class THSR_TrainTimeTable(Base):
+    __tablename__ = 'thsr_traintimetable'
+
+    id = Column(Integer, primary_key=True)
+    date = Column(Date)
+    train_id = Column(Integer, ForeignKey('thsr_train.id'))
+    train = relationship("THSR_Train",
+                         backref=backref("traintimetable", cascade="all, delete-orphan"))
+
+    def __init__(self, date):
+        self.date = date
+
+
+class THSR_TableEntry(TableEntry, Base):
+    __tablename__ = "thsr_tableentry"
+
+    timetable_id = Column(Integer, ForeignKey('thsr_traintimetable.id'))
+    timetable = relationship("THSR_TrainTimeTable",
+                             backref=backref("entries",
+                                             cascade="all, delete-orphan",
+                                             order_by='THSR_TableEntry.arrival_time'))
+
+
+class THSR_BuildingStatusOnDate(BuildingStatusOnDate, Base):
+    __tablename__ = "thsr_dataupdatestatus"
 
 
 """

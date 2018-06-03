@@ -4,20 +4,25 @@ import os
 from datetime import datetime
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from linebot.models import PostbackEvent
+from linebot.models import PostbackEvent, TemplateSendMessage
 from linebot.exceptions import LineBotApiError
 
 from .load_example import load_example_timetable_to_database, drop_all_table
-from models import Base, TRA_QuestionState, User, Group
+from models import (
+    Base, TRA_QuestionState, THSR_QuestionState, User, Group
+)
 from handlers import (
     request_TRA_matching_train, ask_TRA_question_states,
-    handle_follow_event, handle_join_event, handle_unfollow_event, handle_leave_event
+    request_THSR_matching_train, ask_THSR_question_states,
+    handle_follow_event, handle_join_event, handle_unfollow_event,
+    handle_leave_event, match_text_and_assign
 )
 from app import app
 
 engine = create_engine(os.environ["TESTING_DATABASE_URI"])
 Session = sessionmaker(bind=engine)
-TEST_DATE = datetime(2018, 6, 2)
+TEST_DATE_1 = datetime(2018, 6, 2)
+TEST_DATE_2 = datetime(2018, 6, 5)
 
 
 class BaseTestCase(unittest.TestCase):
@@ -42,7 +47,7 @@ class BaseTRATestCase(BaseTestCase):
     def setUpClass(cls):
         super().setUpClass()
         session = Session()
-        load_example_timetable_to_database(session, TEST_DATE)
+        load_example_timetable_to_database(session, TEST_DATE_1)
 
 
 class TestCase_for_request_TRA_matching_train(BaseTRATestCase):
@@ -74,12 +79,7 @@ class TestCase_for_request_TRA_matching_train(BaseTRATestCase):
                                    destination_station="高雄",
                                    departure_time=datetime(2018, 6, 2, 7, 0))
             res = request_TRA_matching_train(qs)
-            for i in range(len(res)):
-                _l = res[i]
-                ans = [_l[0].train.train_no, _l[0].train.train_type,
-                       _l[1].departure_time.strftime("%H:%M"),
-                       _l[2].arrival_time.strftime("%H:%M")]
-                self.assertEqual(ans, correct_list[i])
+            self.check(correct_list, res)
 
     def test_case_2(self):
         correct_list = [['1272', '區間', '22:19', '22:23'], ['2254', '區間', '22:37', '22:41'],
@@ -212,7 +212,7 @@ class TestCase_for_ask_TRA_question_states(BaseTRATestCase):
         mock_source.user_id = mock_source.group_id = user_id = group = "123"
         event.source = mock_source
         mock_postback = MagicMock()
-        mock_postback.params = {"datetime":"2018-06-02T07:00"}
+        mock_postback.params = {"datetime": "2018-06-02T07:00"}
         event.postback = mock_postback
         qs_1 = TRA_QuestionState(group=group, user=user_id,
                                  departure_station="新竹",
@@ -225,7 +225,6 @@ class TestCase_for_ask_TRA_question_states(BaseTRATestCase):
 
 
 class TestCase_for_follow_unfollow_join_joinning_event(BaseTestCase):
-
     def clean_user_table(self):
         self.app.session.query(User).delete()
 
@@ -278,3 +277,246 @@ class TestCase_for_follow_unfollow_join_joinning_event(BaseTestCase):
         self.assertEqual(result.group_id, "123")
         self.assertFalse(result.joinning)
         self.assertIsNotNone(result.leave_datetime)
+
+
+class BaseTHSRTestCase(BaseTestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        session = Session()
+        load_example_timetable_to_database(session, TEST_DATE_2, "THSR")
+
+
+class TestCase_for_request_THSR_matching_train(BaseTHSRTestCase):
+    def check(self, correct_list, result):
+        for i in range(len(result)):
+            _l = result[i]
+            ans = [_l[0].train.train_no,
+                   _l[1].departure_time.strftime("%H:%M"),
+                   _l[2].arrival_time.strftime("%H:%M")]
+            self.assertEqual(ans, correct_list[i])
+
+    def test_case_1(self):
+        correct_list = [['0803', '07:02', '08:40'],
+                        ['0603', '07:27', '08:50'],
+                        ['0805', '07:47', '09:25'],
+                        ['0609', '08:22', '09:45'],
+                        ['0809', '08:47', '10:25'],
+                        ['0613', '08:56', '10:20'],
+                        ['0615', '09:22', '10:45'],
+                        ['0813', '09:47', '11:25'],
+                        ['0619', '09:56', '11:20'],
+                        ['0621', '10:22', '11:45'],
+                        ['0817', '10:47', '12:25'],
+                        ['0625', '10:56', '12:20'],
+                        ['0627', '11:22', '12:45'],
+                        ['0821', '11:47', '13:25'],
+                        ['0633', '12:22', '13:45'],
+                        ['0825', '12:47', '14:25'],
+                        ['0639', '13:22', '14:45'],
+                        ['0829', '13:47', '15:25'],
+                        ['0645', '14:22', '15:45'],
+                        ['0833', '14:47', '16:25'],
+                        ['0651', '15:22', '16:45'],
+                        ['0837', '15:47', '17:25'],
+                        ['0657', '16:22', '17:45'],
+                        ['0841', '16:47', '18:25'],
+                        ['0661', '16:56', '18:20'],
+                        ['0663', '17:22', '18:45'],
+                        ['0845', '17:47', '19:25'],
+                        ['0667', '17:56', '19:20'],
+                        ['0669', '18:22', '19:45'],
+                        ['0849', '18:47', '20:25'],
+                        ['0673', '18:56', '20:20'],
+                        ['0675', '19:22', '20:45'],
+                        ['0853', '19:47', '21:25'],
+                        ['0681', '20:22', '21:45'],
+                        ['0857', '20:47', '22:25'],
+                        ['0687', '21:22', '22:45'],
+                        ['0861', '21:47', '23:25'],
+                        ['0693', '22:17', '23:40']]
+
+        with self.app.app_context():
+            qs = THSR_QuestionState(group=None, user='123',
+                                    departure_station="新竹",
+                                    destination_station="左營",
+                                    departure_time=datetime(2018, 6, 5, 7, 0))
+            res = request_THSR_matching_train(qs)
+            self.check(correct_list, res)
+
+    def test_case_2(self):
+        correct_list = [['0621', '10:22', '11:32'], ['0817', '10:47', '12:11'], ['0625', '10:56', '12:06'],
+                        ['0627', '11:22', '12:32'], ['0821', '11:47', '13:11'], ['0633', '12:22', '13:32'],
+                        ['0825', '12:47', '14:11'], ['0639', '13:22', '14:32'], ['0829', '13:47', '15:11'],
+                        ['0645', '14:22', '15:32'], ['0833', '14:47', '16:11'], ['0651', '15:22', '16:32'],
+                        ['0837', '15:47', '17:11'], ['0657', '16:22', '17:32'], ['0841', '16:47', '18:11'],
+                        ['0661', '16:56', '18:06'], ['0663', '17:22', '18:32'], ['0845', '17:47', '19:11'],
+                        ['0667', '17:56', '19:06'], ['0669', '18:22', '19:32'], ['0849', '18:47', '20:11'],
+                        ['0673', '18:56', '20:06'], ['0675', '19:22', '20:32'], ['0853', '19:47', '21:11'],
+                        ['0681', '20:22', '21:32'], ['0857', '20:47', '22:11'], ['0687', '21:22', '22:32'],
+                        ['0861', '21:47', '23:11'], ['0693', '22:17', '23:27']]
+
+        with self.app.app_context():
+            qs = THSR_QuestionState(group=None, user='123',
+                                    departure_station="新竹",
+                                    destination_station="臺南",
+                                    departure_time=datetime(2018, 6, 5, 10, 0))
+            res = request_THSR_matching_train(qs)
+            self.check(correct_list, res)
+
+
+class TestCase_for_ask_THSR_question_states(BaseTHSRTestCase):
+    def tearDown(self):
+        self.app.session.query(THSR_QuestionState).delete()
+        self.app.session.commit()
+        super().tearDown()
+
+    def test_multiple_question_states_exists(self):
+        mock_event = MagicMock()
+        mock_event.source.user_id = mock_event.source.group_id = user_id = group = "123"
+        # Create two questions states
+        qs_1 = THSR_QuestionState(group=group, user=user_id)
+        self.app.session.add(qs_1)
+        qs_2 = THSR_QuestionState(group=group, user=user_id)
+        self.app.session.add(qs_2)
+        with self.app.app_context():
+            result = ask_THSR_question_states(mock_event)
+            # Should return None and expire all question states
+            self.assertIsNone(result)
+            q = self.app.session.query(THSR_QuestionState).all()
+            self.assertEqual(len(q), 2)
+            for i in q:
+                self.assertEqual(i.expired, True)
+
+    def test_message_choosing_departure_station(self):
+        mock_event = MagicMock()
+        mock_event.source.user_id = mock_event.source.group_id = user_id = group = "123"
+        mock_event.message.text = "新竹"
+        qs_1 = THSR_QuestionState(group=group, user=user_id)
+        self.app.session.add(qs_1)
+        with self.app.app_context():
+            result = ask_THSR_question_states(mock_event)
+            self.assertEqual(result.text, "請輸入目的站")
+
+    def test_message_choosing_destination_station(self):
+        mock_event = MagicMock()
+        mock_event.source.user_id = mock_event.source.group_id = user_id = group = "123"
+        mock_event.message.text = "左營"
+        qs_1 = THSR_QuestionState(group=group, user=user_id,
+                                  departure_station="新竹")
+        self.app.session.add(qs_1)
+        with self.app.app_context():
+            result = ask_THSR_question_states(mock_event)
+            self.assertEqual(result.alt_text, "請選擇搭乘時間")
+
+    def test_destination_station_is_same_with_departure_station(self):
+        mock_event = MagicMock()
+        mock_event.source.user_id = mock_event.source.group_id = user_id = group = "123"
+        mock_event.message.text = "新竹"
+        qs_1 = THSR_QuestionState(group=group, user=user_id, departure_station="新竹")
+        self.app.session.add(qs_1)
+        with self.app.app_context():
+            result = ask_THSR_question_states(mock_event)
+            self.assertEqual(result.text, "輸入的目的站與起程站皆是新竹，請重新輸入有效目的站")
+
+    def test_message_choosing_datetime(self):
+        correct_items_in_result = ['0803', '07:02', '07:30', '0603', '07:27', '07:51', '0805', '07:47', '08:15', '1505',
+                                   '08:12', '08:42', '0609', '08:22', '08:46', '0809', '08:47', '09:15', '0613',
+                                   '08:56', '09:23', '0615', '09:22', '09:46', '0813', '09:47', '10:15', '0619',
+                                   '09:56', '10:23', '0621', '10:22', '10:46', '0817', '10:47', '11:15', '0625',
+                                   '10:56', '11:23', '0627', '11:22', '11:46', '0821', '11:47', '12:15', '0633',
+                                   '12:22', '12:46', '0825', '12:47', '13:15', '0639', '13:22', '13:46', '0829',
+                                   '13:47', '14:15', '0645', '14:22', '14:46', '0833', '14:47', '15:15', '0651',
+                                   '15:22', '15:46', '0837', '15:47', '16:15', '0657', '16:22', '16:46', '0841',
+                                   '16:47', '17:15', '0661', '16:56', '17:23', '0663', '17:22', '17:46', '0845',
+                                   '17:47', '18:15', '0667', '17:56', '18:23', '0669', '18:22', '18:46', '0849',
+                                   '18:47', '19:15', '0673', '18:56', '19:23', '0675', '19:22', '19:46', '0853',
+                                   '19:47', '20:15', '0681', '20:22', '20:46', '0857', '20:47', '21:15', '0687',
+                                   '21:22', '21:46', '0861', '21:47', '22:15', '0693', '22:17', '22:41', '0565',
+                                   '23:00', '23:29', '0567', '23:32']
+
+        event = PostbackEvent()
+        mock_source = MagicMock()
+        mock_source.user_id = mock_source.group_id = user_id = group = "123"
+        event.source = mock_source
+        mock_postback = MagicMock()
+        mock_postback.params = {"datetime": "2018-06-05T07:00"}
+        event.postback = mock_postback
+        qs_1 = THSR_QuestionState(group=group, user=user_id,
+                                  departure_station="新竹",
+                                  destination_station="臺中")
+        self.app.session.add(qs_1)
+        with self.app.app_context():
+            result = ask_THSR_question_states(event)
+            for item in correct_items_in_result:
+                self.assertIn(item, result.text)
+
+
+class TestCase_for_match_text_and_assign(BaseTestCase):
+    def test_request_main_menu(self):
+        mock_event = MagicMock()
+        mock_event.source.user_id = mock_event.source.group_id = user_id = group_id = "123"
+        mock_event.message.text = "t"
+        with self.app.app_context():
+            res = match_text_and_assign(mock_event)
+        self.assertIsInstance(res, TemplateSendMessage)
+        self.assertEqual(res.alt_text, "請選擇查詢交通類型")
+        mock_event.message.text = "T"
+        with self.app.app_context():
+            res = match_text_and_assign(mock_event)
+        self.assertIsInstance(res, TemplateSendMessage)
+        self.assertEqual(res.alt_text, "請選擇查詢交通類型")
+
+    def test_if_one_TRA_questionstate_exists_and_start_search_THSR(self):
+        mock_event = MagicMock()
+        mock_event.source.user_id = mock_event.source.group_id = user_id = group_id = "123"
+        mock_event.message.text = "查高鐵"
+        q_1 = TRA_QuestionState(group=group_id, user=user_id, departure_station="新竹")
+        self.app.session.add(q_1)
+        with self.app.app_context():
+            res = match_text_and_assign(mock_event)
+        # Check q_1 has been expired
+        rq_1 = self.app.session.query(TRA_QuestionState).one()
+        self.assertTrue(rq_1.expired)
+        # Check that THSR has been created
+        rq_2 = self.app.session.query(THSR_QuestionState).one()
+        self.assertFalse(rq_2.expired)
+        self.assertEqual(rq_2.user, user_id)
+        self.assertEqual(rq_2.group, group_id)
+        self.assertEqual(res.text, "請輸入起程站")
+
+    def test_if_multiple_TRA_questionstates_exists_and_start_search_TRA(self):
+        mock_event = MagicMock()
+        mock_event.source.user_id = mock_event.source.group_id = user_id = group_id = "123"
+        mock_event.message.text = "查臺鐵"
+        q_1 = TRA_QuestionState(group=group_id, user=user_id, departure_station="新竹")
+        q_1.expired = True
+        q_2 = TRA_QuestionState(group=group_id, user=user_id, departure_station="高雄")
+        self.app.session.add(q_1)
+        self.app.session.add(q_2)
+        with self.app.app_context():
+            res = match_text_and_assign(mock_event)
+        rq_1 = self.app.session.query(TRA_QuestionState).filter_by(expired=True).all()
+        self.assertEqual(len(rq_1), 2)
+        rq_2 = self.app.session.query(TRA_QuestionState).filter_by(expired=False).one()
+        self.assertEqual(rq_2.user, user_id)
+        self.assertEqual(rq_2.group, group_id)
+        self.assertEqual(res.text, "請輸入起程站")
+
+    def test_if_multiple_THSR_questionstates_exists_and_start_search_THSR(self):
+        mock_event = MagicMock()
+        mock_event.source.user_id = mock_event.source.group_id = user_id = group_id = "123"
+        mock_event.message.text = "查高鐵"
+        q_1 = THSR_QuestionState(group=group_id, user=user_id, departure_station="新竹")
+        q_1.expired = True
+        q_2 = THSR_QuestionState(group=group_id, user=user_id, departure_station="左營")
+        self.app.session.add(q_1)
+        self.app.session.add(q_2)
+        with self.app.app_context():
+            res = match_text_and_assign(mock_event)
+        rq_1 = self.app.session.query(THSR_QuestionState).filter_by(expired=True).all()
+        self.assertEqual(len(rq_1), 2)
+        rq_2 = self.app.session.query(THSR_QuestionState).filter_by(expired=False).one()
+        self.assertEqual(rq_2.user, user_id)
+        self.assertEqual(rq_2.group, group_id)
+        self.assertEqual(res.text, "請輸入起程站")

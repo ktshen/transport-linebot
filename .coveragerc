@@ -1,0 +1,4 @@
+[run]
+omit =  compose/*
+	myenv/*
+	tests/*

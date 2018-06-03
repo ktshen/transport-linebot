@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from build_database import build_TRA_Database_by_date, remove_TRA_timetable_by_date
+from build_database import build_TRA_database_by_date, remove_TRA_timetable_by_date
 from models import Base, TRA_BuildingStatusOnDate
 
 # Load env variables
@@ -37,7 +37,7 @@ def build_TRA():
         d = today + timedelta(i)
         ignore_built = True if i == 0 else False
         print("Start building TRA DATABASE on {0}".format(convert_date_to_string(d)))
-        resp = build_TRA_Database_by_date(d, session, ignore_built)
+        resp = build_TRA_database_by_date(d, session, ignore_built)
         print("Finish TRA DATABASE on {0}, result={1}".format(convert_date_to_string(d),
                                                               resp.message))
     session.close()

@@ -9,6 +9,7 @@ import base64
 import requests
 import re
 
+
 def request_MOTC(url):
     """
     To request data from http://ptx.transportdata.tw/MOTC#!/, a signature is needed, and the generation
@@ -30,6 +31,7 @@ def request_MOTC(url):
         "x-date": xdate,
         "Accept-Encoding": "gzip, deflate",
     }
+    url += "?$format=JSON"
     return requests.get(url, headers=headers)
 
 
