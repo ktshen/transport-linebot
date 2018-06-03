@@ -6,8 +6,13 @@ from datetime import datetime, timedelta
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from build_database import build_TRA_database_by_date, remove_TRA_timetable_by_date
-from models import Base, TRA_BuildingStatusOnDate
+from build_database import (
+    build_TRA_database_by_date, remove_TRA_timetable_by_date,
+    build_THSR_database_by_date, remove_THSR_timetable_by_date
+)
+from models import (
+    Base, TRA_BuildingStatusOnDate, THSR_BuildingStatusOnDate
+)
 
 # Load env variables
 dotenv_path = os.path.join(os.getcwd(), '.env')
@@ -55,10 +60,35 @@ def clear_TRA_history():
     session.close()
 
 
+def build_THSR():
+    session = Session()
+    today = datetime.now().date()
+    for i in range(int(os.environ["PRESCEDULE_DAYS"])):
+        d = today + timedelta(i)
+        ignore_built = True if i == 0 else False
+        print("Start building THSR DATABASE on {0}".format(convert_date_to_string(d)))
+        resp = build_THSR_database_by_date(d, session, ignore_built)
+        print("Finish THSR DATABASE on {0}, result={1}".format(convert_date_to_string(d),
+                                                               resp.message))
+    session.close()
+
+
+def clear_THSR_history():
+    session = Session()
+    history_date = (datetime.now() - timedelta(1)).date()
+    q = session.query(THSR_BuildingStatusOnDate) \
+               .filter(THSR_BuildingStatusOnDate.assigned_date < history_date).all()
+    if not q:
+        return True
+    for s in q:
+        remove_THSR_timetable_by_date(s.assigned_date, session)
+    session.close()
+
+
 # 24-HOUR
 RUN_JOBS_AT_TIME = "00:00"
 # Specify periodic jobs here
-JOB_QUEUE = [build_TRA, clear_TRA_history]
+JOB_QUEUE = [build_TRA, clear_TRA_history, build_THSR, clear_THSR_history]
 
 
 def run_all_job():

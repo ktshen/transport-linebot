@@ -8,3 +8,4 @@ test.py
 postgres_*/
 htmlcov/
 .coverage
+ptx_keys.txt

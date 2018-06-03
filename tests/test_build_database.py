@@ -92,6 +92,16 @@ class TestCase_for_build_TRA_database_by_date(BaseTestCase):
         build_status = self.session.query(TRA_BuildingStatusOnDate).one()
         self.assertEqual(build_status.status, 3)
 
+    def test_if_already_built_then_skip(self):
+        date_input = date(2018, 6, 2)
+        status = TRA_BuildingStatusOnDate(date_input, status=2)
+        self.session.add(status)
+        resp = build_TRA_database_by_date(date_input, self.session)
+        self.assertEqual(resp.value, 0)
+        self.assertEqual(self.session.query(TRA_Train).count(), 0)
+        self.assertEqual(self.session.query(TRA_TrainTimeTable).count(), 0)
+        self.assertEqual(self.session.query(TRA_TableEntry).count(), 0)
+
 
 class TestCase_for_build_THSR_database_by_date(BaseTestCase):
     @patch("build_database.request_THSR_all_train_timetable")
@@ -166,3 +176,13 @@ class TestCase_for_build_THSR_database_by_date(BaseTestCase):
         self.assertEqual(self.session.query(THSR_TableEntry).count(), 0)
         build_status = self.session.query(THSR_BuildingStatusOnDate).one()
         self.assertEqual(build_status.status, 3)
+
+    def test_if_already_built_then_skip(self):
+        date_input = date(2018, 6, 2)
+        status = THSR_BuildingStatusOnDate(date_input, status=2)
+        self.session.add(status)
+        resp = build_THSR_database_by_date(date_input, self.session)
+        self.assertEqual(resp.value, 0)
+        self.assertEqual(self.session.query(THSR_Train).count(), 0)
+        self.assertEqual(self.session.query(THSR_TrainTimeTable).count(), 0)
+        self.assertEqual(self.session.query(THSR_TableEntry).count(), 0)

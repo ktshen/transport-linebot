@@ -53,7 +53,6 @@ def request_TRA_all_train_no_by_date(date_input):
     except Exception as e:
         traceback.print_exc(file=sys.stdout)
         return ResponseMessage(1)
-    resp = resp.json()
     if not resp:
         return ResponseMessage(2)
     elif "message" in resp:
@@ -76,8 +75,6 @@ def request_TRA_train_timetable_by_date(train_no, date_input):
     except Exception as e:
         traceback.print_exc(file=sys.stdout)
         return ResponseMessage(1)
-    resp = resp.json()
-
     if not resp:
         return ResponseMessage(2)
     elif "message" in resp:
@@ -228,6 +225,7 @@ def build_TRA_database_by_date(date_input, session, build_anyway=False):
         for train_no in train_no_list:
             response = request_TRA_train_timetable_by_date(train_no, date_input)
             if isinstance(response, ResponseMessage):
+                remove_TRA_timetable_by_date(date_input, session)
                 return response
             build_TRA_traintimetable(response, session, date_input)
         session.commit()
@@ -289,7 +287,6 @@ def request_THSR_all_train_timetable(date_input):
     except:
         traceback.print_exc(file=sys.stdout)
         return ResponseMessage(1)
-    resp = resp.json()
     if not resp:
         return ResponseMessage(2)
     elif "message" in resp:
