@@ -55,7 +55,7 @@ def request_TRA_all_train_timetable_by_date(date_input):
         return ResponseMessage(2)
     elif "message" in resp:
         return ResponseMessage(10, resp["message"])
-    return resp[0]
+    return resp
 
 
 def convert_TRA_traintype_code2name(traintype_code):
