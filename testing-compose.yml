@@ -1,0 +1,22 @@
+version: '3'
+
+volumes:
+  caddy: {}
+  postgres_data: {}
+  postgres_backup: {}
+
+services:
+  postgres:
+    build: ./compose/postgres
+    volumes:
+      - ./postgres_data:/var/lib/postgresql/data
+      - ./postgres_backup:/backups
+    env_file: .env
+
+  test:
+    build:
+      context: .
+      dockerfile: ./compose/test/Dockerfile
+    env_file: .env
+    depends_on:
+      - postgres

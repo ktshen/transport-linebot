@@ -1,7 +1,7 @@
 import pickle
 import os
 from build_database import (
-    ResponseMessage, request_TRA_all_train_timetable_by_date,
+    request_TRA_all_train_timetable_by_date,
     build_TRA_traintimetable, check_TRA_building_status_by_date,
     request_THSR_all_train_timetable, check_THSR_building_status_by_date,
     build_THSR_traintimetable

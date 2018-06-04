@@ -65,7 +65,7 @@ class TestCase_for_build_TRA_database_by_date(BaseTestCase):
         self.assertEqual(self.session.query(TRA_TableEntry).count(), 36771)
         self.assertEqual(self.session.query(TRA_BuildingStatusOnDate).count(), 2)
 
-    @patch("build_database.request_TRA_all_train_no_by_date")
+    @patch("build_database.request_TRA_all_train_timetable_by_date")
     def test_remove_old_data_before_building(self, mock_request_train_no):
         date_input = date(2018, 6, 2)
         load_example_timetable_to_database(self.session, date_input)
