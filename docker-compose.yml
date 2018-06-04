@@ -8,11 +8,10 @@ volumes:
 services:
   postgres:
     build: ./compose/postgres
+    env_file: .env
     volumes:
       - ./postgres_data:/var/lib/postgresql/data
       - ./postgres_backup:/backups
-    env_file: .env
-    volumes:
       - /etc/localtime:/etc/localtime:ro
 
   flask:
