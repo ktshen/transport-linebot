@@ -32,13 +32,14 @@ Session = sessionmaker(bind=engine)
 
 def build_TRA():
     """
+    台鐵提供近60天每日時刻表
     Building strategy for TRA:
     1. update tomorrow's data on every midnight anyway
     2. make sure that data within a month has existed
     """
     session = Session()
     today = datetime.now().date()
-    for i in range(int(os.environ["PRESCEDULE_DAYS"])):
+    for i in range(60):
         d = today + timedelta(i)
         ignore_built = True if i == 0 else False
         print("Start building TRA DATABASE on {0}".format(convert_date_to_string(d)))
@@ -61,9 +62,12 @@ def clear_TRA_history():
 
 
 def build_THSR():
+    """
+    高鐵提供近45天每日時刻表
+    """
     session = Session()
     today = datetime.now().date()
-    for i in range(int(os.environ["PRESCEDULE_DAYS"])):
+    for i in range(45):
         d = today + timedelta(i)
         ignore_built = True if i == 0 else False
         print("Start building THSR DATABASE on {0}".format(convert_date_to_string(d)))
