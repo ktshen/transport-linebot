@@ -1,7 +1,7 @@
 import pickle
 import os
 from build_database import (
-    ResponseMessage, request_TRA_all_train_no_by_date, request_TRA_train_timetable_by_date,
+    ResponseMessage, request_TRA_all_train_timetable_by_date,
     build_TRA_traintimetable, check_TRA_building_status_by_date,
     request_THSR_all_train_timetable, check_THSR_building_status_by_date,
     build_THSR_traintimetable
@@ -13,12 +13,10 @@ FILENAME_FORMAT = "{0}-all-{1}-trains-timetable.pickle"
 
 def create_new_TRA_example_by_date(date_input, file_path):
     outfile = open(file_path, "wb")
-    all_train = request_TRA_all_train_no_by_date(date_input)
+    all_train = request_TRA_all_train_timetable_by_date(date_input)
     try:
-        for tn in all_train:
-            timetable = request_TRA_train_timetable_by_date(tn, date_input)
-            if not isinstance(timetable, ResponseMessage):
-                pickle.dump(timetable, outfile, pickle.HIGHEST_PROTOCOL)
+        for tb in all_train:
+            pickle.dump(tb, outfile, pickle.HIGHEST_PROTOCOL)
     except Exception as e:
         print(e)
     outfile.close()

@@ -26,19 +26,15 @@ class BaseTestCase(unittest.TestCase):
 
 
 class TestCase_for_build_TRA_database_by_date(BaseTestCase):
-    @patch("build_database.request_TRA_train_timetable_by_date")
-    @patch("build_database.request_TRA_all_train_no_by_date")
-    def test_building(self, mock_request_train_no, mock_request_timetable):
+    @patch("build_database.request_TRA_all_train_timetable_by_date")
+    def test_building(self, mock_request):
         # input first day data
         date_input = date(2018, 6, 2)
         loader = TimeTableExampleLoader(date_input)
-        all_train_no = list()
         timetables = list()
         for tb in loader:
             timetables.append(tb)
-            all_train_no.append(tb["DailyTrainInfo"]["TrainNo"])
-        mock_request_train_no.return_value = all_train_no
-        mock_request_timetable.side_effect = timetables
+        mock_request.return_value = timetables
         resp = build_TRA_database_by_date(date_input, self.session)
         self.assertEqual(resp.value, 0)
         self.assertEqual(self.session.query(TRA_Train).count(), 902)
@@ -50,13 +46,10 @@ class TestCase_for_build_TRA_database_by_date(BaseTestCase):
         # Input second day data
         date_input_2 = date(2018, 6, 6)
         loader = TimeTableExampleLoader(date_input_2)
-        all_train_no = list()
         timetables = list()
         for tb in loader:
             timetables.append(tb)
-            all_train_no.append(tb["DailyTrainInfo"]["TrainNo"])
-        mock_request_train_no.return_value = all_train_no
-        mock_request_timetable.side_effect = timetables
+        mock_request.return_value = timetables
         resp = build_TRA_database_by_date(date_input_2, self.session)
         self.assertEqual(resp.value, 0)
         self.assertEqual(self.session.query(TRA_Train).count(), 940)
@@ -65,7 +58,6 @@ class TestCase_for_build_TRA_database_by_date(BaseTestCase):
         self.assertEqual(self.session.query(TRA_BuildingStatusOnDate).count(), 2)
 
         # Build second day data again
-        mock_request_timetable.side_effect = timetables
         resp = build_TRA_database_by_date(date_input_2, self.session, build_anyway=True)
         self.assertEqual(resp.value, 0)
         self.assertEqual(self.session.query(TRA_Train).count(), 940)

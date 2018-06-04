@@ -12,9 +12,7 @@ from data import (
     TRA_STATION_CODE2NAME, TRA_TRAINTYPE_CODE2NAME, THSR_STATION_CODE2NAME
 )
 
-
-URL_FOR_ALL_TRA_TRAIN_NO_BY_DATE = "http://ptx.transportdata.tw/MOTC/v2/Rail/TRA/DailyTrainInfo/TrainDate/{0}"
-URL_FOR_TRA_TRAIN_NO_TIMETABLE_BY_DATE = "http://ptx.transportdata.tw/MOTC/v2/Rail/TRA/DailyTimetable/TrainNo/{0}/TrainDate/{1}"
+URL_FOR_ALL_TRA_TRAIN_NO_AND_TIMETABLE = "http://ptx.transportdata.tw/MOTC/v2/Rail/TRA/DailyTimetable/TrainDate/{0}"
 URL_FOR_ALL_THSR_TRAIN_NO_AND_TIMETABLE = "http://ptx.transportdata.tw/MOTC/v2/Rail/THSR/DailyTimetable/TrainDate/{0}"
 
 
@@ -45,31 +43,9 @@ class ResponseMessage(object):
         return self.status_dict[self.value]
 
 
-def request_TRA_all_train_no_by_date(date_input):
+def request_TRA_all_train_timetable_by_date(date_input):
     date_string = convert_date_to_string(date_input)
-    url = URL_FOR_ALL_TRA_TRAIN_NO_BY_DATE.format(date_string)
-    try:
-        resp = request_MOTC(url)
-    except Exception as e:
-        traceback.print_exc(file=sys.stdout)
-        return ResponseMessage(1)
-    if not resp:
-        return ResponseMessage(2)
-    elif "message" in resp:
-        return ResponseMessage(10, resp["message"])
-    train_no_list = list()
-    for entry in resp:
-        train_no = entry["TrainNo"]
-        train_no_list.append(train_no)
-    return train_no_list
-
-
-def request_TRA_train_timetable_by_date(train_no, date_input):
-    """
-    :return: the dictionary in the response or a error ResponseType
-    """
-    date_string = convert_date_to_string(date_input)
-    url = URL_FOR_TRA_TRAIN_NO_TIMETABLE_BY_DATE.format(train_no, date_string)
+    url = URL_FOR_ALL_TRA_TRAIN_NO_AND_TIMETABLE.format(date_string)
     try:
         resp = request_MOTC(url)
     except Exception as e:
@@ -215,19 +191,15 @@ def build_TRA_database_by_date(date_input, session, build_anyway=False):
             pass
 
         # Get a list of train no on specified date
-        response = request_TRA_all_train_no_by_date(date_input)
+        response = request_TRA_all_train_timetable_by_date(date_input)
         if isinstance(response, ResponseMessage):
             return response
         else:
-            train_no_list = response
+            all_trains = response
         # Remove the older data and build the database
         remove_TRA_timetable_by_date(date_input, session)
-        for train_no in train_no_list:
-            response = request_TRA_train_timetable_by_date(train_no, date_input)
-            if isinstance(response, ResponseMessage):
-                remove_TRA_timetable_by_date(date_input, session)
-                return response
-            build_TRA_traintimetable(response, session, date_input)
+        for tb in all_trains:
+            build_TRA_traintimetable(tb, session, date_input)
         session.commit()
         return ResponseMessage(0)
     except Exception as e:
