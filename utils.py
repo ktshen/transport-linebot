@@ -7,6 +7,7 @@ from time import mktime
 import base64
 import requests
 import re
+import time
 
 
 keys_candidates = list()
@@ -42,14 +43,21 @@ def request_MOTC(url):
 
     url += "?$format=JSON"
     r = None
+    # In my experience, PTX platform is not stable, so try multiple times to work around
+    # If message in response, then the problem is probably related to the key, so change the key
+    # If message is an empty list, then try again with that key
     for i in range(len(keys_candidates)):
         headers = prepare_headers(keys_candidates[i][0], keys_candidates[i][1])
-        r = requests.get(url, headers=headers)
-        r = r.json()
-        if "message" in r:
-            continue
-        else:
-            return r
+        for j in range(5):
+            r = requests.get(url, headers=headers)
+            r = r.json()
+            if "message" in r:
+                break
+            elif not r:
+                time.sleep(1)
+                continue
+            else:
+                return r
     return r
 
 
