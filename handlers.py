@@ -1,4 +1,5 @@
 import re
+import os
 from datetime import datetime, timedelta, time
 from flask import current_app
 from linebot.models import (
@@ -13,8 +14,13 @@ from models import (
     User, Group, TRA_QuestionState, TRA_TableEntry, TRA_TrainTimeTable,
     THSR_QuestionState, THSR_TableEntry, THSR_TrainTimeTable
 )
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 from data import TRA_STATION_CODE2NAME, THSR_STATION_CODE2NAME
 from utils import pre_process_text
+
+engine = create_engine(os.environ["DATABASE_URI"])
+Session = sessionmaker(bind=engine)
 
 
 def create_error_text_message(text=""):
@@ -35,7 +41,7 @@ def request_matching_train(qs, train_type):
         timetableclass = THSR_TrainTimeTable
         table_entry_class = THSR_TableEntry
     if time(0) < qs.departure_time.time() < time(3):
-        request_date = qs.departure_time().date() - timedelta(1)
+        request_date = qs.departure_time.date() - timedelta(1)
     else:
         request_date = qs.departure_time.date()
     q = current_app.session.query(timetableclass).filter(timetableclass.date == request_date) \
@@ -181,8 +187,7 @@ def ask_TRA_question_states(event):
             if not suitable_trains:
                 text = "無適合班次"
             else:
-                text = "適合班次如下  {0} → {1} \n" \
-                       "車次   車種  開車時間  抵達時間\n".format(qs.departure_station, qs.destination_station)
+                text = "車次   車種  開車時間  抵達時間\n"
                 fmt = "{0:0>4}  {1:^2}     {2}        {3}\n"
                 for _l in suitable_trains:
                     text = text + fmt.format(_l[0].train.train_no, _l[0].train.train_type,
@@ -192,7 +197,21 @@ def ask_TRA_question_states(event):
                     if len(text) > 1000:
                         text = text + "More...\n"
                         break
-            message = TextSendMessage(text=text)
+            message = TemplateSendMessage(
+                            alt_text='搜尋結果:{0} → {1}'.format(qs.departure_station, qs.destination_station),
+                            template=ButtonsTemplate(
+                                title="適合班次如下  {0} → {1}".format(qs.departure_station, qs.destination_station),
+                                text=text,
+                                actions=[
+                                    DatetimePickerTemplateAction(label='更換搭乘時間', data='datetime_postback',
+                                                                 mode='datetime'),
+                                    MessageTemplateAction(
+                                        label='新的搜尋',
+                                        text='TTT'
+                                    ),
+                                ]
+                            )
+                        )
         except KeyError:
             pass
     if message:
@@ -272,18 +291,30 @@ def ask_THSR_question_states(event):
             if not suitable_trains:
                 text = "無適合班次"
             else:
-                text = "適合班次如下  {0} → {1} \n" \
-                       "車次     開車時間    抵達時間\n".format(qs.departure_station, qs.destination_station)
-                fmt = "{0:0>4}       {1}         {2}\n"
+                text = "車次     開車時間    抵達時間".format(qs.departure_station, qs.destination_station)
+                fmt = "{0:0>4}       {1}          {2}\n"
                 for _l in suitable_trains:
                     text = text + fmt.format(_l[0].train.train_no,
                                              _l[1].departure_time.strftime("%H:%M"),
                                              _l[2].arrival_time.strftime("%H:%M"))
-                    # Total word number of a post is limited
                     if len(text) > 1000:
                         text = text + "More...\n"
                         break
-            message = TextSendMessage(text=text)
+            message = TemplateSendMessage(
+                            alt_text='搜尋結果:{0} → {1}'.format(qs.departure_station, qs.destination_station),
+                            template=ButtonsTemplate(
+                                title="適合班次如下  {0} → {1}".format(qs.departure_station, qs.destination_station),
+                                text=text,
+                                actions=[
+                                    DatetimePickerTemplateAction(label='更換搭乘時間', data='datetime_postback',
+                                                                 mode='datetime'),
+                                    MessageTemplateAction(
+                                        label='新的搜尋',
+                                        text='TTT'
+                                    ),
+                                ]
+                            )
+                        )
         except KeyError:
             pass
     if message:
@@ -374,6 +405,10 @@ def handle_postback_event(event):
 
 def handle_events(events):
     for ev in events:
+        # Create new session for each request and tear it down after the process ends
+        # For more information look at the link below:
+        # http://docs.sqlalchemy.org/en/latest/orm/session_basics.html#when-do-i-construct-a-session-when-do-i-commit-it-and-when-do-i-close-it
+        current_app.session = Session()
         response = None
         if isinstance(ev, MessageEvent):
             response = handle_message_event(ev)
@@ -390,5 +425,6 @@ def handle_events(events):
         else:
             pass
         current_app.session.commit()
+        current_app.session.close()
         if response is not None:
             current_app.linebot.reply_message(ev.reply_token, response)

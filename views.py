@@ -1,15 +1,9 @@
-import os
 from flask import request, abort
 from flask import current_app
 from flask.views import View
 from linebot.exceptions import InvalidSignatureError
 from datetime import datetime
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 from handlers import handle_events
-
-engine = create_engine(os.environ["DATABASE_URI"])
-Session = sessionmaker(bind=engine)
 
 
 def register_url(app):
@@ -41,10 +35,5 @@ class LineRequestView(View):
         except InvalidSignatureError:
             current_app.logger.error("Invalid Signature.")
             abort(400)
-        # Create new session for each request and tear it down after the process ends
-        # For more information look at the link below:
-        # http://docs.sqlalchemy.org/en/latest/orm/session_basics.html#when-do-i-construct-a-session-when-do-i-commit-it-and-when-do-i-close-it
-        current_app.session = Session()
         handle_events(events)
-        current_app.session.close()
         return 'OK'
