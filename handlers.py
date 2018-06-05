@@ -1,5 +1,5 @@
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 from flask import current_app
 from linebot.models import (
     MessageEvent, JoinEvent, LeaveEvent, FollowEvent, UnfollowEvent,
@@ -34,11 +34,16 @@ def request_matching_train(qs, train_type):
     elif train_type == "THSR":
         timetableclass = THSR_TrainTimeTable
         table_entry_class = THSR_TableEntry
-
+    if time(0) < qs.departure_time.time() < time(3):
+        request_date = qs.departure_time().date() - timedelta(1)
+    else:
+        request_date = qs.departure_time.date()
     q_1 = current_app.session.query(timetableclass).join("entries") \
+                     .filter(timetableclass.date == request_date) \
                      .filter(table_entry_class.station_name == qs.departure_station) \
                      .filter(table_entry_class.departure_time > qs.departure_time)
     q_2 = current_app.session.query(timetableclass).join("entries") \
+                     .filter(timetableclass.date == request_date) \
                      .filter(table_entry_class.station_name == qs.destination_station) \
                      .filter(table_entry_class.arrival_time > qs.departure_time)
     q = q_1.intersect(q_2)
@@ -66,7 +71,6 @@ def request_matching_train(qs, train_type):
             continue
         suitable_trains.append([t, dep_entry, dest_entry])
     suitable_trains = sorted(suitable_trains, key=lambda x: x[1].departure_time)
-    q.expired = True
     return suitable_trains
 
 
@@ -107,6 +111,7 @@ def search_TRA_train(event):
     q_state = TRA_QuestionState(group=None if not hasattr(event.source, "group_id") else event.source.group_id,
                                 user=event.source.user_id)
     current_app.session.add(q_state)
+    current_app.session.commit()
     message = TextSendMessage(text="請輸入起程站")
     return message
 
@@ -164,26 +169,29 @@ def ask_TRA_question_states(event):
         elif res == qs.departure_station:
             message = create_error_text_message(
                 text="輸入的目的站與起程站皆是{0}，請重新輸入有效目的站".format(res))
-    elif not qs.departure_time and isinstance(event, PostbackEvent):
-        dt = event.postback.params["datetime"]
-        dt = datetime.strptime(dt, "%Y-%m-%dT%H:%M")
-        qs.departure_time = dt
-        suitable_trains = request_TRA_matching_train(qs)
-        if not suitable_trains:
-            text = "無適合班次"
-        else:
-            text = "適合班次如下  {0} → {1} \n" \
-                   "車次   車種  開車時間  抵達時間\n".format(qs.departure_station, qs.destination_station)
-            fmt = "{0:0>4}  {1:^2}     {2}        {3}\n"
-            for _l in suitable_trains:
-                text = text + fmt.format(_l[0].train.train_no, _l[0].train.train_type,
-                                         _l[1].departure_time.strftime("%H:%M"),
-                                         _l[2].arrival_time.strftime("%H:%M"))
-                # Total word number of a post is limited
-                if len(text) > 1500:
-                    text = text + "More...\n"
-                    break
-        message = TextSendMessage(text=text)
+    elif isinstance(event, PostbackEvent) and qs.departure_station and qs.destination_station:
+        try:
+            dt = event.postback.params["datetime"]
+            dt = datetime.strptime(dt, "%Y-%m-%dT%H:%M")
+            qs.departure_time = dt
+            suitable_trains = request_TRA_matching_train(qs)
+            if not suitable_trains:
+                text = "無適合班次"
+            else:
+                text = "適合班次如下  {0} → {1} \n" \
+                       "車次   車種  開車時間  抵達時間\n".format(qs.departure_station, qs.destination_station)
+                fmt = "{0:0>4}  {1:^2}     {2}        {3}\n"
+                for _l in suitable_trains:
+                    text = text + fmt.format(_l[0].train.train_no, _l[0].train.train_type,
+                                             _l[1].departure_time.strftime("%H:%M"),
+                                             _l[2].arrival_time.strftime("%H:%M"))
+                    # Total word number of a post is limited
+                    if len(text) > 1000:
+                        text = text + "More...\n"
+                        break
+            message = TextSendMessage(text=text)
+        except KeyError:
+            pass
     if message:
         qs.update = now
     return message
@@ -194,6 +202,7 @@ def search_THSR_train(event):
     q_state = THSR_QuestionState(group=None if not hasattr(event.source, "group_id") else event.source.group_id,
                                  user=event.source.user_id)
     current_app.session.add(q_state)
+    current_app.session.commit()
     message = TextSendMessage(text="請輸入起程站")
     return message
 
@@ -214,8 +223,8 @@ def request_THSR_matching_train(qs):
 def ask_THSR_question_states(event):
     now = datetime.now()
     qs = current_app.session.query(THSR_QuestionState).filter_by(expired=False) \
-                    .filter_by(user=event.source.user_id) \
-                    .filter(THSR_QuestionState.update > (now - timedelta(hours=1)))
+                            .filter_by(user=event.source.user_id) \
+                            .filter(THSR_QuestionState.update > (now - timedelta(hours=1)))
     if hasattr(event.source, "group_id"):
         qs = qs.filter_by(group=event.source.group_id)
     try:
@@ -251,26 +260,29 @@ def ask_THSR_question_states(event):
         elif res == qs.departure_station:
             message = create_error_text_message(
                 text="輸入的目的站與起程站皆是{0}，請重新輸入有效目的站".format(res))
-    elif not qs.departure_time and isinstance(event, PostbackEvent):
-        dt = event.postback.params["datetime"]
-        dt = datetime.strptime(dt, "%Y-%m-%dT%H:%M")
-        qs.departure_time = dt
-        suitable_trains = request_THSR_matching_train(qs)
-        if not suitable_trains:
-            text = "無適合班次"
-        else:
-            text = "適合班次如下  {0} → {1} \n" \
-                   "車次   開車時間  抵達時間\n".format(qs.departure_station, qs.destination_station)
-            fmt = "{0:0>4}    {1}       {2}\n"
-            for _l in suitable_trains:
-                text = text + fmt.format(_l[0].train.train_no,
-                                         _l[1].departure_time.strftime("%H:%M"),
-                                         _l[2].arrival_time.strftime("%H:%M"))
-                # Total word number of a post is limited
-                if len(text) > 1500:
-                    text = text + "More...\n"
-                    break
-        message = TextSendMessage(text=text)
+    elif isinstance(event, PostbackEvent) and qs.departure_station and qs.destination_station:
+        try:
+            dt = event.postback.params["datetime"]
+            dt = datetime.strptime(dt, "%Y-%m-%dT%H:%M")
+            qs.departure_time = dt
+            suitable_trains = request_THSR_matching_train(qs)
+            if not suitable_trains:
+                text = "無適合班次"
+            else:
+                text = "適合班次如下  {0} → {1} \n" \
+                       "車次   開車時間  抵達時間\n".format(qs.departure_station, qs.destination_station)
+                fmt = "{0:0>4}    {1}       {2}\n"
+                for _l in suitable_trains:
+                    text = text + fmt.format(_l[0].train.train_no,
+                                             _l[1].departure_time.strftime("%H:%M"),
+                                             _l[2].arrival_time.strftime("%H:%M"))
+                    # Total word number of a post is limited
+                    if len(text) > 1000:
+                        text = text + "More...\n"
+                        break
+            message = TextSendMessage(text=text)
+        except KeyError:
+            pass
     if message:
         qs.update = now
     return message
@@ -307,7 +319,7 @@ def handle_message_event(event):
 
 def unfollow_user(user_id):
     q = current_app.session.query(User).filter_by(user_id=user_id) \
-                                       .filter_by(following=True).all()
+                           .filter_by(following=True).all()
     for i in q:
         i.following = False
         i.unfollow_datetime = datetime.now()

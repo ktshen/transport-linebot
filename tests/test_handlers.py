@@ -39,6 +39,9 @@ class BaseTestCase(unittest.TestCase):
         self.app.session = Session()
 
     def tearDown(self):
+        self.app.session.query(TRA_QuestionState).delete()
+        self.app.session.query(THSR_QuestionState).delete()
+        self.app.session.commit()
         self.app.session.close()
 
 
@@ -141,11 +144,6 @@ class TestCase_for_request_TRA_matching_train(BaseTRATestCase):
 
 
 class TestCase_for_ask_TRA_question_states(BaseTRATestCase):
-    def tearDown(self):
-        self.app.session.query(TRA_QuestionState).delete()
-        self.app.session.commit()
-        super().tearDown()
-
     def test_multiple_question_states_exists(self):
         mock_event = MagicMock()
         mock_event.source.user_id = mock_event.source.group_id = user_id = group = "123"
@@ -366,11 +364,6 @@ class TestCase_for_request_THSR_matching_train(BaseTHSRTestCase):
 
 
 class TestCase_for_ask_THSR_question_states(BaseTHSRTestCase):
-    def tearDown(self):
-        self.app.session.query(THSR_QuestionState).delete()
-        self.app.session.commit()
-        super().tearDown()
-
     def test_multiple_question_states_exists(self):
         mock_event = MagicMock()
         mock_event.source.user_id = mock_event.source.group_id = user_id = group = "123"
@@ -432,8 +425,7 @@ class TestCase_for_ask_THSR_question_states(BaseTHSRTestCase):
                                    '17:47', '18:15', '0667', '17:56', '18:23', '0669', '18:22', '18:46', '0849',
                                    '18:47', '19:15', '0673', '18:56', '19:23', '0675', '19:22', '19:46', '0853',
                                    '19:47', '20:15', '0681', '20:22', '20:46', '0857', '20:47', '21:15', '0687',
-                                   '21:22', '21:46', '0861', '21:47', '22:15', '0693', '22:17', '22:41', '0565',
-                                   '23:00', '23:29', '0567', '23:32']
+                                   '21:22', '21:46', '0861', '21:47', '22:15']
 
         event = PostbackEvent()
         mock_source = MagicMock()

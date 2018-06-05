@@ -354,17 +354,17 @@ def build_THSR_database_by_date(date_input, session, build_anyway=False):
         elif not isinstance(date_input, date):
             raise TypeError("Need a date object.")
         # This will create a new THSR_BuildingStatusOnDate with status 0 if not exists
+        # We assume that only one process is running all the time. So there is no competitive problem
+        # so if the status is 1, it is probably terminated while running previously
         building_status = check_THSR_building_status_by_date(date_input, session)
         if not build_anyway and building_status == 2:
             return ResponseMessage(0)
-        # We assume that only one process is running all the time. So there is no competitive problem
-        # so if the status is 1, it is probably terminated while running previously
-        # Remove the older data and build the database
-        remove_THSR_timetable_by_date(date_input, session)
         # Get a list of train no on specified date
         response = request_THSR_all_train_timetable(date_input)
         if isinstance(response, ResponseMessage):
             return response
+        # Remove the older data and build the database
+        remove_THSR_timetable_by_date(date_input, session)
         for train in response:
             build_THSR_traintimetable(train, session, date_input)
         session.commit()
