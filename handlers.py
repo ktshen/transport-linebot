@@ -19,6 +19,15 @@ from sqlalchemy.orm import sessionmaker
 from data import TRA_STATION_CODE2NAME, THSR_STATION_CODE2NAME
 from utils import pre_process_text
 
+INTRO_TEXT = "hi~ 我是火車時刻機器人🚆\n" \
+             "> 輸入: 大寫或小寫T \n" \
+             "就可以呼叫我喔～～😘\n\n" \
+             "其他指令\n" \
+             "- issue (回報問題)\n" \
+             "- github (歡迎共同開發)\n" \
+             "註：若沒有反應請稍待或重新輸入\n" \
+             "因主機較舊且網路不好，感謝～"
+
 engine = create_engine(os.environ["DATABASE_URI"])
 Session = sessionmaker(bind=engine)
 
@@ -113,6 +122,17 @@ def request_main_menu():
         )
     )
     return menu
+
+
+def request_github():
+    return TextSendMessage(text="https://github.com/ktshen/transport-linebot")
+
+
+def request_issue():
+    return TextSendMessage(text="請寄信到 ktshen.meow@gmail.com 說明問題\n"
+                                "或者到github發issue喔：\n"
+                                "https://github.com/ktshen/transport-linebot\n"
+                                "thank you 👍")
 
 
 def search_TRA_train(event):
@@ -237,8 +257,8 @@ def ask_question_states(event):
             if not suitable_trains:
                 text = "無適合班次"
             elif train_type == "TRA":
-                text = "車次   車種  開車時間  抵達時間\n"
-                fmt = "{0:0>4}  {1:^2}     {2}        {3}\n"
+                text = "車次   車種      開車         抵達\n"
+                fmt = "{0:0>4}  {1:^2}     {2}       {3}\n"
                 count = 0
                 for _l in suitable_trains:
                     text = text + fmt.format(_l[0].train.train_no, _l[0].train.train_type,
@@ -264,7 +284,7 @@ def ask_question_states(event):
                 if len(suitable_trains) > count:
                     actions.insert(0, MessageTemplateAction(label='列出更多', text='列出更多'))
             message = TemplateSendMessage(
-                alt_text='搜尋結果:{0} → {1}'.format(qs.departure_station, qs.destination_station),
+                alt_text='搜尋結果: {0} → {1}'.format(qs.departure_station, qs.destination_station),
                 template=ButtonsTemplate(text=text, actions=actions)
             )
         except KeyError:
@@ -285,7 +305,7 @@ def ask_question_states(event):
                                          _l[1].departure_time.strftime("%H:%M"),
                                          _l[2].arrival_time.strftime("%H:%M"))
                 if len(text) > 1000:
-                    text = text + "More...\n"
+                    text = text + "More..."
                     break
         else:
             text = "適合班次如下  {0} → {1} \n" \
@@ -296,7 +316,7 @@ def ask_question_states(event):
                                          _l[1].departure_time.strftime("%H:%M"),
                                          _l[2].arrival_time.strftime("%H:%M"))
                 if len(text) > 1000:
-                    text = text + "More...\n"
+                    text = text + "More..."
                     break
         message = TextSendMessage(text=text)
     if message:
@@ -315,6 +335,10 @@ def match_text_and_assign(event):
         res = search_TRA_train(event)
     elif re.fullmatch(r'^[ ]*查?(高鐵|THSR)$', text):
         res = search_THSR_train(event)
+    elif re.fullmatch(r'^[Gg]ithub$', text):
+        res = request_github()
+    elif re.fullmatch(r'^issue$', text):
+        res = request_issue()
     else:
         res = ask_question_states(event)
     return res
@@ -339,9 +363,7 @@ def unfollow_user(user_id):
 
 
 def handle_follow_event(event):
-    text = "hi~ 我是火車時刻機器人 \U0001f686\n" \
-           "> 輸入: 大寫或小寫T \n" \
-           "就可以呼叫我喔～～\U0001f618\n"
+    text = INTRO_TEXT
     unfollow_user(user_id=event.source.user_id)
     new_user = User(event.source.user_id)
     current_app.session.add(new_user)
@@ -362,9 +384,7 @@ def leave_group(group_id):
 
 
 def handle_join_event(event):
-    text = "hi~ 我是火車時刻機器人 \U0001f686\n" \
-           "> 輸入: 大寫或小寫T \n" \
-           "就可以呼叫我喔～～\U0001f618\n"
+    text = INTRO_TEXT
     leave_group(event.source.group_id)
     new_group = Group(event.source.group_id)
     current_app.session.add(new_group)
