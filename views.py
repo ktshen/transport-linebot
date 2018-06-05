@@ -46,6 +46,5 @@ class LineRequestView(View):
         # http://docs.sqlalchemy.org/en/latest/orm/session_basics.html#when-do-i-construct-a-session-when-do-i-commit-it-and-when-do-i-close-it
         current_app.session = Session()
         handle_events(events)
-        current_app.session.commit()
         current_app.session.close()
         return 'OK'

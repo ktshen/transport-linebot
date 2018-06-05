@@ -273,8 +273,8 @@ def ask_THSR_question_states(event):
                 text = "無適合班次"
             else:
                 text = "適合班次如下  {0} → {1} \n" \
-                       "車次   開車時間  抵達時間\n".format(qs.departure_station, qs.destination_station)
-                fmt = "{0:0>4}    {1}       {2}\n"
+                       "車次     開車時間    抵達時間\n".format(qs.departure_station, qs.destination_station)
+                fmt = "{0:0>4}       {1}         {2}\n"
                 for _l in suitable_trains:
                     text = text + fmt.format(_l[0].train.train_no,
                                              _l[1].departure_time.strftime("%H:%M"),
@@ -316,8 +316,7 @@ def handle_message_event(event):
         current_app.logger.error(e.error.message)
         current_app.logger.error(e.error.details)
         response = create_error_text_message()
-    if response is not None:
-        current_app.linebot.reply_message(event.reply_token, response)
+    return response
 
 
 def unfollow_user(user_id):
@@ -332,11 +331,11 @@ def handle_follow_event(event):
     text = "hi~ 我是火車時刻機器人 \U0001f686\n" \
            "> 輸入: 大寫或小寫T \n" \
            "就可以呼叫我喔～～\U0001f618\n"
-    response = TextSendMessage(text=text)
     unfollow_user(user_id=event.source.user_id)
     new_user = User(event.source.user_id)
     current_app.session.add(new_user)
-    current_app.linebot.reply_message(event.reply_token, response)
+    current_app.session.commit()
+    return TextSendMessage(text=text)
 
 
 def handle_unfollow_event(event):
@@ -355,11 +354,11 @@ def handle_join_event(event):
     text = "hi~ 我是火車時刻機器人 \U0001f686\n" \
            "> 輸入: 大寫或小寫T \n" \
            "就可以呼叫我喔～～\U0001f618\n"
-    response = TextSendMessage(text=text)
     leave_group(event.source.group_id)
     new_group = Group(event.source.group_id)
     current_app.session.add(new_group)
-    current_app.linebot.reply_message(event.reply_token, response)
+    current_app.session.commit()
+    return TextSendMessage(text=text)
 
 
 def handle_leave_event(event):
@@ -370,24 +369,26 @@ def handle_postback_event(event):
     response = ask_TRA_question_states(event)
     if not response:
         response = ask_THSR_question_states(event)
-
-    if response is not None:
-        current_app.linebot.reply_message(event.reply_token, response)
+    return response
 
 
 def handle_events(events):
     for ev in events:
+        response = None
         if isinstance(ev, MessageEvent):
-            handle_message_event(ev)
+            response = handle_message_event(ev)
         elif isinstance(ev, FollowEvent):
-            handle_follow_event(ev)
+            response = handle_follow_event(ev)
         elif isinstance(ev, UnfollowEvent):
             handle_unfollow_event(ev)
         elif isinstance(ev, JoinEvent):
-            handle_join_event(ev)
+            response = handle_join_event(ev)
         elif isinstance(ev, LeaveEvent):
             handle_leave_event(ev)
         elif isinstance(ev, PostbackEvent):
-            handle_postback_event(ev)
+            response = handle_postback_event(ev)
         else:
             pass
+        current_app.session.commit()
+        if response is not None:
+            current_app.linebot.reply_message(ev.reply_token, response)
