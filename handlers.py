@@ -8,7 +8,7 @@ from linebot.models import (
 )
 from linebot.exceptions import LineBotApiError
 from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
-
+from sqlalchemy import and_
 from models import (
     User, Group, TRA_QuestionState, TRA_TableEntry, TRA_TrainTimeTable,
     THSR_QuestionState, THSR_TableEntry, THSR_TrainTimeTable
@@ -38,15 +38,16 @@ def request_matching_train(qs, train_type):
         request_date = qs.departure_time().date() - timedelta(1)
     else:
         request_date = qs.departure_time.date()
-    q_1 = current_app.session.query(timetableclass).join("entries") \
-                     .filter(timetableclass.date == request_date) \
-                     .filter(table_entry_class.station_name == qs.departure_station) \
-                     .filter(table_entry_class.departure_time > qs.departure_time)
-    q_2 = current_app.session.query(timetableclass).join("entries") \
-                     .filter(timetableclass.date == request_date) \
-                     .filter(table_entry_class.station_name == qs.destination_station) \
-                     .filter(table_entry_class.arrival_time > qs.departure_time)
-    q = q_1.intersect(q_2)
+    q = current_app.session.query(timetableclass).filter(timetableclass.date == request_date) \
+        .filter(
+            and_(timetableclass.entries.any(and_(
+                table_entry_class.station_name == qs.departure_station,
+                table_entry_class.departure_time > qs.departure_time
+            )),
+                timetableclass.entries.any(and_(table_entry_class.station_name == qs.destination_station,
+                                                table_entry_class.arrival_time > qs.departure_time))
+            )
+        )
     suitable_trains = list()
     for t in q:
         dep_q = current_app.session.query(table_entry_class) \
@@ -223,8 +224,8 @@ def request_THSR_matching_train(qs):
 def ask_THSR_question_states(event):
     now = datetime.now()
     qs = current_app.session.query(THSR_QuestionState).filter_by(expired=False) \
-                            .filter_by(user=event.source.user_id) \
-                            .filter(THSR_QuestionState.update > (now - timedelta(hours=1)))
+                    .filter_by(user=event.source.user_id) \
+                    .filter(THSR_QuestionState.update > (now - timedelta(hours=1)))
     if hasattr(event.source, "group_id"):
         qs = qs.filter_by(group=event.source.group_id)
     try:
