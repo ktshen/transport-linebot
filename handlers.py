@@ -42,7 +42,8 @@ def request_matching_train(qs, train_type):
         .filter(
             and_(timetableclass.entries.any(and_(
                 table_entry_class.station_name == qs.departure_station,
-                table_entry_class.departure_time > qs.departure_time
+                table_entry_class.departure_time > qs.departure_time,
+                table_entry_class.departure_time < qs.departure_time + timedelta(hours=5)
             )),
                 timetableclass.entries.any(and_(table_entry_class.station_name == qs.destination_station,
                                                 table_entry_class.arrival_time > qs.departure_time))
@@ -53,7 +54,8 @@ def request_matching_train(qs, train_type):
         dep_q = current_app.session.query(table_entry_class) \
                            .filter(table_entry_class.timetable == t) \
                            .filter_by(station_name=qs.departure_station) \
-                           .filter(table_entry_class.departure_time > qs.departure_time) \
+                           .filter(and_(table_entry_class.departure_time > qs.departure_time,
+                                        table_entry_class.departure_time < qs.departure_time + timedelta(hours=5))) \
                            .order_by(table_entry_class.departure_time)
         try:
             dep_entry = dep_q.one()
