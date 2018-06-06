@@ -22,10 +22,14 @@ from utils import pre_process_text
 INTRO_TEXT = "hi~ 我是火車時刻機器人🚆\n" \
              "> 輸入: 大寫或小寫T \n" \
              "就可以呼叫我喔～～😘\n\n" \
+             "快速指令\n" \
+             "- T (選單)\n" \
+             "- 臺鐵\n" \
+             "- 高鐵\n\n" \
              "其他指令\n" \
-             "- issue (回報問題)\n" \
-             "- github (歡迎共同開發)\n" \
-             "註：因主機較舊，\n若沒有反應請稍待或重新輸入，感謝～\n" \
+             "- Issue (回報問題)\n" \
+             "- Github (歡迎共同開發)\n" \
+             "註：因主機較舊，若沒有反應\n請稍待或重新輸入，感謝😂\n"
 
 engine = create_engine(os.environ["DATABASE_URI"])
 Session = sessionmaker(bind=engine)
@@ -339,7 +343,7 @@ def match_text_and_assign(event):
         res = search_THSR_train(event)
     elif re.fullmatch(r'^[Gg]ithub$', text):
         res = request_github()
-    elif re.fullmatch(r'^issue$', text):
+    elif re.fullmatch(r'^[iI]ssue$', text):
         res = request_issue()
     else:
         res = ask_question_states(event)
