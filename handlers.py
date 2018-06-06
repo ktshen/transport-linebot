@@ -19,7 +19,7 @@ from sqlalchemy.orm import sessionmaker
 from data import TRA_STATION_CODE2NAME, THSR_STATION_CODE2NAME
 from utils import pre_process_text
 
-INTRO_TEXT = "hi~ 我是火車時刻機器人🚆\n" \
+INTRO_TEXT = "嗨~ 我是火車時刻機器人🚆\n" \
              "> 輸入: 大寫或小寫T \n" \
              "就可以呼叫我喔～～😘\n\n" \
              "快速指令\n" \
