@@ -25,7 +25,7 @@ INTRO_TEXT = "hi~ 我是火車時刻機器人🚆\n" \
              "其他指令\n" \
              "- issue (回報問題)\n" \
              "- github (歡迎共同開發)\n" \
-             "註：因主機較舊且網路不好，\n若沒有反應請稍待或重新輸入，感謝～\n" \
+             "註：因主機較舊，\n若沒有反應請稍待或重新輸入，感謝～\n" \
 
 engine = create_engine(os.environ["DATABASE_URI"])
 Session = sessionmaker(bind=engine)
@@ -174,6 +174,7 @@ def match_THSR_station_name(text):
         return None
     stations_name = THSR_STATION_CODE2NAME.values()
     text = pre_process_text(text)
+    text = re.sub(r'高雄', '左營', text)
     for s in stations_name:
         if re.match(s, text):
             return s

@@ -24,7 +24,7 @@ try:
 except KeyError:
     raise KeyError("Please specify DATABASE_URI in environment")
 
-time.sleep(5) # wait for postgresql to start
+time.sleep(10)  # wait for postgresql to start
 engine = create_engine(DATABASE_URI)
 Base.metadata.create_all(engine)
 Session = sessionmaker(bind=engine)
