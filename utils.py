@@ -48,7 +48,7 @@ def request_MOTC(url):
     # If message is an empty list, then try again with that key
     for i in range(len(keys_candidates)):
         headers = prepare_headers(keys_candidates[i][0], keys_candidates[i][1])
-        for j in range(5):
+        for j in range(10):
             r = requests.get(url, headers=headers)
             r = r.json()
             if "message" in r:

@@ -41,9 +41,8 @@ def build_TRA():
     today = datetime.now().date()
     for i in range(60):
         d = today + timedelta(i)
-        ignore_built = True if i == 0 else False
         print("Start building TRA DATABASE on {0}".format(convert_date_to_string(d)))
-        resp = build_TRA_database_by_date(d, session, ignore_built)
+        resp = build_TRA_database_by_date(d, session)
         print("Finish TRA DATABASE on {0}, result={1}".format(convert_date_to_string(d),
                                                               resp.message))
     session.close()
@@ -69,9 +68,8 @@ def build_THSR():
     today = datetime.now().date()
     for i in range(45):
         d = today + timedelta(i)
-        ignore_built = True if i == 0 else False
         print("Start building THSR DATABASE on {0}".format(convert_date_to_string(d)))
-        resp = build_THSR_database_by_date(d, session, ignore_built)
+        resp = build_THSR_database_by_date(d, session)
         print("Finish THSR DATABASE on {0}, result={1}".format(convert_date_to_string(d),
                                                                resp.message))
     session.close()

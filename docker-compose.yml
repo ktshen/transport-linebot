@@ -10,7 +10,6 @@ services:
     build: ./compose/postgres
     env_file: .env
     volumes:
-      - ./postgres_data:/var/lib/postgresql/data
       - ./postgres_backup:/backups
       - /etc/localtime:/etc/localtime:ro
 

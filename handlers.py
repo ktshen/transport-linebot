@@ -25,8 +25,7 @@ INTRO_TEXT = "hi~ 我是火車時刻機器人🚆\n" \
              "其他指令\n" \
              "- issue (回報問題)\n" \
              "- github (歡迎共同開發)\n" \
-             "註：若沒有反應請稍待或重新輸入\n" \
-             "因主機較舊且網路不好，感謝～"
+             "註：因主機較舊且網路不好，\n若沒有反應請稍待或重新輸入，感謝～\n" \
 
 engine = create_engine(os.environ["DATABASE_URI"])
 Session = sessionmaker(bind=engine)
@@ -146,6 +145,8 @@ def search_TRA_train(event):
 
 
 def match_TRA_station_name(text):
+    if len(text) > 5:
+        return None
     stations_name = TRA_STATION_CODE2NAME.values()
     text = pre_process_text(text)
     for s in stations_name:
@@ -169,6 +170,8 @@ def search_THSR_train(event):
 
 
 def match_THSR_station_name(text):
+    if len(text) > 4:
+        return None
     stations_name = THSR_STATION_CODE2NAME.values()
     text = pre_process_text(text)
     for s in stations_name:
@@ -185,8 +188,7 @@ def ask_question_states(event):
     now = datetime.now()
     train_type = ""
     qs = current_app.session.query(TRA_QuestionState).filter_by(expired=False) \
-        .filter_by(user=event.source.user_id) \
-        .filter(TRA_QuestionState.update > (now - timedelta(hours=1)))
+        .filter_by(user=event.source.user_id)
     if hasattr(event.source, "group_id"):
         qs = qs.filter_by(group=event.source.group_id)
     try:
@@ -200,8 +202,7 @@ def ask_question_states(event):
 
     if not train_type:
         qs = current_app.session.query(THSR_QuestionState).filter_by(expired=False) \
-            .filter_by(user=event.source.user_id) \
-            .filter(THSR_QuestionState.update > (now - timedelta(hours=1)))
+            .filter_by(user=event.source.user_id)
         try:
             qs = qs.one()
             train_type = "THSR"
