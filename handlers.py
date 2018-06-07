@@ -20,7 +20,8 @@ from data import TRA_STATION_CODE2NAME, THSR_STATION_CODE2NAME
 from utils import pre_process_text
 
 INTRO_TEXT = "嗨~ 我是火車時刻機器人🚆\n" \
-             "> 輸入: 大寫或小寫T \n" \
+             "輸入: 大寫或小寫T \n" \
+             "或是點擊下面功能選單\n" \
              "就可以呼叫我喔～～😘\n\n" \
              "快速指令\n" \
              "- T (選單)\n" \
@@ -254,6 +255,10 @@ def ask_question_states(event):
             dt = event.postback.params["datetime"]
             dt = datetime.strptime(dt, "%Y-%m-%dT%H:%M")
             qs.departure_time = dt
+            if qs.group:
+                current_app.linebot.push_message(qs.group, TextSendMessage(text="搜尋中..."))
+            else:
+                current_app.linebot.push_message(qs.user, TextSendMessage(text="搜尋中..."))
             if train_type == "TRA":
                 suitable_trains = request_TRA_matching_train(qs)
             else:
@@ -296,6 +301,10 @@ def ask_question_states(event):
         except KeyError:
             pass
     elif event.message.text == "列出更多" and qs.departure_station and qs.destination_station and qs.departure_time:
+        if qs.group:
+            current_app.linebot.push_message(qs.group, TextSendMessage(text="搜尋中..."))
+        else:
+            current_app.linebot.push_message(qs.user, TextSendMessage(text="搜尋中..."))
         if train_type == "TRA":
             suitable_trains = request_TRA_matching_train(qs)
         else:
