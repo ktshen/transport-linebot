@@ -5,15 +5,13 @@ from datetime import datetime
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from linebot.models import PostbackEvent, TemplateSendMessage
-from linebot.exceptions import LineBotApiError
 
 from .load_example import load_example_timetable_to_database, drop_all_table
 from models import (
     Base, TRA_QuestionState, THSR_QuestionState, User, Group
 )
 from handlers import (
-    request_TRA_matching_train, ask_TRA_question_states,
-    request_THSR_matching_train, ask_THSR_question_states,
+    request_TRA_matching_train, request_THSR_matching_train, ask_question_states,
     handle_follow_event, handle_join_event, handle_unfollow_event,
     handle_leave_event, match_text_and_assign
 )
@@ -153,7 +151,7 @@ class TestCase_for_ask_TRA_question_states(BaseTRATestCase):
         qs_2 = TRA_QuestionState(group=group, user=user_id)
         self.app.session.add(qs_2)
         with self.app.app_context():
-            result = ask_TRA_question_states(mock_event)
+            result = ask_question_states(mock_event)
             # Should return None and expire all question states
             self.assertIsNone(result)
             q = self.app.session.query(TRA_QuestionState).all()
@@ -168,7 +166,7 @@ class TestCase_for_ask_TRA_question_states(BaseTRATestCase):
         qs_1 = TRA_QuestionState(group=group, user=user_id)
         self.app.session.add(qs_1)
         with self.app.app_context():
-            result = ask_TRA_question_states(mock_event)
+            result = ask_question_states(mock_event)
             self.assertEqual(result.text, "請輸入目的站")
 
     def test_message_choosing_destination_station(self):
@@ -179,7 +177,7 @@ class TestCase_for_ask_TRA_question_states(BaseTRATestCase):
                                  departure_station="新竹")
         self.app.session.add(qs_1)
         with self.app.app_context():
-            result = ask_TRA_question_states(mock_event)
+            result = ask_question_states(mock_event)
             self.assertEqual(result.alt_text, "請選擇搭乘時間")
 
     def test_destination_station_is_same_with_departure_station(self):
@@ -190,20 +188,12 @@ class TestCase_for_ask_TRA_question_states(BaseTRATestCase):
                                  departure_station="新竹")
         self.app.session.add(qs_1)
         with self.app.app_context():
-            result = ask_TRA_question_states(mock_event)
+            result = ask_question_states(mock_event)
             self.assertEqual(result.text, "輸入的目的站與起程站皆是新竹，請重新輸入有效目的站")
 
     def test_message_choosing_datetime(self):
         correct_items_in_result = ['0051', '莒光', '07:19', '11:16', '0103', '自強', '07:40', '11:32', '0105', '自強',
-                                   '08:14', '12:10', '0507', '莒光', '08:53', '14:15', '0113', '自強', '09:38', '13:21',
-                                   '0115', '自強', '10:13', '13:53', '0511', '莒光', '10:54', '15:49', '0117', '自強',
-                                   '11:05', '14:51', '0121', '自強', '12:10', '16:00', '0513', '莒光', '12:49', '18:01',
-                                   '0123', '自強', '13:10', '16:50', '0125', '自強', '14:13', '17:50', '0129', '自強',
-                                   '15:08', '18:49', '0561', '莒光', '15:20', '20:38', '0133', '自強', '15:33', '18:15',
-                                   '0135', '自強', '16:10', '19:54', '0175', '自強', '17:10', '20:58', '0521', '莒光',
-                                   '17:46', '22:59', '0139', '自強', '18:10', '21:51', '0141', '自強', '18:40', '22:24',
-                                   '0145', '自強', '19:20', '23:06', '0149', '自強', '19:56', '23:47', '0181', '自強',
-                                   '20:37', '00:17']
+                                   '08:14', '12:10', '0507', '莒光', '08:53', '14:15']
 
         event = PostbackEvent()
         mock_source = MagicMock()
@@ -217,9 +207,9 @@ class TestCase_for_ask_TRA_question_states(BaseTRATestCase):
                                  destination_station="高雄")
         self.app.session.add(qs_1)
         with self.app.app_context():
-            result = ask_TRA_question_states(event)
+            result = ask_question_states(event)
             for item in correct_items_in_result:
-                self.assertIn(item, result.text)
+                self.assertIn(item, result.template.text)
 
 
 class TestCase_for_follow_unfollow_join_joinning_event(BaseTestCase):
@@ -238,8 +228,7 @@ class TestCase_for_follow_unfollow_join_joinning_event(BaseTestCase):
         mock_event = MagicMock()
         mock_event.source.user_id = mock_event.reply_token = "123"
         with self.app.app_context():
-            with self.assertRaises(LineBotApiError):
-                handle_follow_event(mock_event)
+            handle_follow_event(mock_event)
         q = self.app.session.query(User).one()
         self.assertEqual(q.user_id, "123")
 
@@ -259,8 +248,7 @@ class TestCase_for_follow_unfollow_join_joinning_event(BaseTestCase):
         mock_event = MagicMock()
         mock_event.source.group_id = mock_event.reply_token = "123"
         with self.app.app_context():
-            with self.assertRaises(LineBotApiError):
-                handle_join_event(mock_event)
+            handle_join_event(mock_event)
         q = self.app.session.query(Group).one()
         self.assertEqual(q.group_id, "123")
 
@@ -373,7 +361,7 @@ class TestCase_for_ask_THSR_question_states(BaseTHSRTestCase):
         qs_2 = THSR_QuestionState(group=group, user=user_id)
         self.app.session.add(qs_2)
         with self.app.app_context():
-            result = ask_THSR_question_states(mock_event)
+            result = ask_question_states(mock_event)
             # Should return None and expire all question states
             self.assertIsNone(result)
             q = self.app.session.query(THSR_QuestionState).all()
@@ -388,7 +376,7 @@ class TestCase_for_ask_THSR_question_states(BaseTHSRTestCase):
         qs_1 = THSR_QuestionState(group=group, user=user_id)
         self.app.session.add(qs_1)
         with self.app.app_context():
-            result = ask_THSR_question_states(mock_event)
+            result = ask_question_states(mock_event)
             self.assertEqual(result.text, "請輸入目的站")
 
     def test_message_choosing_destination_station(self):
@@ -399,7 +387,7 @@ class TestCase_for_ask_THSR_question_states(BaseTHSRTestCase):
                                   departure_station="新竹")
         self.app.session.add(qs_1)
         with self.app.app_context():
-            result = ask_THSR_question_states(mock_event)
+            result = ask_question_states(mock_event)
             self.assertEqual(result.alt_text, "請選擇搭乘時間")
 
     def test_destination_station_is_same_with_departure_station(self):
@@ -409,23 +397,12 @@ class TestCase_for_ask_THSR_question_states(BaseTHSRTestCase):
         qs_1 = THSR_QuestionState(group=group, user=user_id, departure_station="新竹")
         self.app.session.add(qs_1)
         with self.app.app_context():
-            result = ask_THSR_question_states(mock_event)
+            result = ask_question_states(mock_event)
             self.assertEqual(result.text, "輸入的目的站與起程站皆是新竹，請重新輸入有效目的站")
 
     def test_message_choosing_datetime(self):
         correct_items_in_result = ['0803', '07:02', '07:30', '0603', '07:27', '07:51', '0805', '07:47', '08:15', '1505',
-                                   '08:12', '08:42', '0609', '08:22', '08:46', '0809', '08:47', '09:15', '0613',
-                                   '08:56', '09:23', '0615', '09:22', '09:46', '0813', '09:47', '10:15', '0619',
-                                   '09:56', '10:23', '0621', '10:22', '10:46', '0817', '10:47', '11:15', '0625',
-                                   '10:56', '11:23', '0627', '11:22', '11:46', '0821', '11:47', '12:15', '0633',
-                                   '12:22', '12:46', '0825', '12:47', '13:15', '0639', '13:22', '13:46', '0829',
-                                   '13:47', '14:15', '0645', '14:22', '14:46', '0833', '14:47', '15:15', '0651',
-                                   '15:22', '15:46', '0837', '15:47', '16:15', '0657', '16:22', '16:46', '0841',
-                                   '16:47', '17:15', '0661', '16:56', '17:23', '0663', '17:22', '17:46', '0845',
-                                   '17:47', '18:15', '0667', '17:56', '18:23', '0669', '18:22', '18:46', '0849',
-                                   '18:47', '19:15', '0673', '18:56', '19:23', '0675', '19:22', '19:46', '0853',
-                                   '19:47', '20:15', '0681', '20:22', '20:46', '0857', '20:47', '21:15', '0687',
-                                   '21:22', '21:46', '0861', '21:47', '22:15']
+                                   '08:12', '08:42']
 
         event = PostbackEvent()
         mock_source = MagicMock()
@@ -439,15 +416,15 @@ class TestCase_for_ask_THSR_question_states(BaseTHSRTestCase):
                                   destination_station="臺中")
         self.app.session.add(qs_1)
         with self.app.app_context():
-            result = ask_THSR_question_states(event)
+            result = ask_question_states(event)
             for item in correct_items_in_result:
-                self.assertIn(item, result.text)
+                self.assertIn(item, result.template.text)
 
 
 class TestCase_for_match_text_and_assign(BaseTestCase):
     def test_request_main_menu(self):
         mock_event = MagicMock()
-        mock_event.source.user_id = mock_event.source.group_id = user_id = group_id = "123"
+        mock_event.source.user_id = mock_event.source.group_id = "123"
         mock_event.message.text = "t"
         with self.app.app_context():
             res = match_text_and_assign(mock_event)

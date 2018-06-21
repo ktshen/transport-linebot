@@ -29,8 +29,7 @@ INTRO_TEXT = "嗨~ 我是火車時刻機器人🚆\n" \
              "- 高鐵\n\n" \
              "其他指令\n" \
              "- Issue (回報問題)\n" \
-             "- Github (歡迎共同開發)\n" \
-             "註：因主機較舊，若沒有反應\n請稍待或重新輸入，感謝😂\n"
+             "- Github (歡迎共同開發)"
 
 engine = create_engine(os.environ["DATABASE_URI"])
 Session = sessionmaker(bind=engine)
