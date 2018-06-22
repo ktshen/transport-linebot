@@ -10,7 +10,7 @@
 ![alt text](https://img.shields.io/badge/License-MIT-blue.svg)
 
 ## Purpose
-You are able to search TRA's and THSR's train timetable on Line. 
+You are able to search TRA and THSR timetable on Line. 
 
 To use this service, click the button or scan the QR Code below to join in right now!
 
@@ -18,6 +18,7 @@ To use this service, click the button or scan the QR Code below to join in right
 
 <img width="150" border="0" alt="QR Code" src="https://i.imgur.com/oaRmKLX.png">
 
+(Service is not available after June 23th, 2018)
 
 ## Demo
 
